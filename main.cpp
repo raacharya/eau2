@@ -231,29 +231,29 @@ int main(int argc, char* argv[]) {
             if(type == ColumnType::STRING) {
                 StringCol* to_add = dynamic_cast<StringCol*>(column);
                 newCol = new StringColumn();
-                for(size_t i = 0; i < column->getLength(); i++) {
-                    newCol->push_back(new String(to_add->getEntry(i)));
+                for(size_t colIndex = 0; colIndex < column->getLength(); colIndex++) {
+                    newCol->push_back(new String(to_add->getEntry(colIndex)));
                 }
                 df.add_column(newCol, nullptr);
             } else if(type == ColumnType::INTEGER) {
                 IntegerCol* to_add = dynamic_cast<IntegerCol*>(column);
                 newCol = new IntColumn();
-                for(size_t i = 0; i < column->getLength(); i++) {
-                    newCol->push_back(to_add->getEntry(i));
+                for(size_t colIndex = 0; colIndex < column->getLength(); colIndex++) {
+                    newCol->push_back(to_add->getEntry(colIndex));
                 }
                 df.add_column(newCol, nullptr);
             } else if(type == ColumnType::FLOAT) {
                 FloatCol* to_add = dynamic_cast<FloatCol*>(column);
                 newCol = new FloatColumn();
-                for(size_t i = 0; i < column->getLength(); i++) {
-                    newCol->push_back(to_add->getEntry(i));
+                for(size_t colIndex = 0; colIndex < column->getLength(); colIndex++) {
+                    newCol->push_back(to_add->getEntry(colIndex));
                 }
                 df.add_column(newCol, nullptr);
             } else {
                 BoolCol* to_add = dynamic_cast<BoolCol*>(column);
                 newCol = new BoolColumn();
-                for(size_t i = 0; i < column->getLength(); i++) {
-                    newCol->push_back(to_add->getEntry(i));
+                for(size_t colIndex = 0; colIndex < column->getLength(); colIndex++) {
+                    newCol->push_back(to_add->getEntry(colIndex));
                 }
                 df.add_column(newCol, nullptr);
             }

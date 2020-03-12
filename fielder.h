@@ -56,7 +56,7 @@ class PrintFielder : public Fielder {
         }
 
         void accept(String *s) {
-            std::cout << " " << s->c_str();
+            std::cout << " \"" << s->c_str() << "\"";
         }
 
         /** Called when all fields have been seen. */
