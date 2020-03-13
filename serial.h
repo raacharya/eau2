@@ -290,25 +290,25 @@ public:
         size_t target;
         size_t id;
 
-        if(curr == "ACK") {
+        if(strcmp(curr, "ACK") == 0) {
             msgKind = MsgKind ::Ack;
-        } else if(curr == "NACK") {
+        } else if (strcmp(curr, "NACK") == 0) {
             msgKind = MsgKind ::Nack;
-        } else if(curr == "PUT") {
+        } else if(strcmp(curr, "PUT") == 0){
             msgKind = MsgKind ::Put;
-        } else if(curr == "REPLY") {
+        } else if(strcmp(curr, "REPLY") == 0){
             msgKind = MsgKind ::Reply;
-        } else if(curr == "GET") {
+        } else if(strcmp(curr, "GET") == 0){
             msgKind = MsgKind ::Get;
-        } else if(curr == "WAITANDGET") {
+        } else if(strcmp(curr, "WAITANDGET") == 0){
             msgKind = MsgKind ::WaitAndGet;
-        } else if(curr == "STATUS") {
+        } else if(strcmp(curr, "STATUS") == 0){
             msgKind = MsgKind ::Status;
-        } else if(curr == "KILL") {
+        } else if(strcmp(curr, "KILL") == 0){
             msgKind = MsgKind ::Kill;
-        } else if(curr == "REGISTER") {
+        } else if(strcmp(curr, "REGISTER") == 0){
             msgKind = MsgKind ::Register;
-        } else if(curr == "DIRECTORY") {
+        } else if(strcmp(curr, "DIRECTORY") == 0){
             msgKind = MsgKind ::Directory;
         }
 
