@@ -103,10 +103,8 @@ public:
 
         while(index < bufferSize) {
             String* currString = arr->get(word);
-            if(index != bufferSize - 1) {
-                buffer[index] = currString->size();
-                index += 1;
-            }
+            buffer[index] = currString->size();
+            index += 1;
             for(size_t i = 0; i < currString->size(); i++) {
                 buffer[index] = currString->at(i);
                 index += 1;
@@ -186,10 +184,8 @@ public:
 
         while(index < bufferSize) {
             float currFloat = arr->get(word);
-            if(index != bufferSize - 1) {
-                buffer[index] = sizeof(currFloat);
-                index += 1;
-            }
+            buffer[index] = sizeof(currFloat);
+            index += 1;
 
             char* serializedFloat = serialize(currFloat);
 
