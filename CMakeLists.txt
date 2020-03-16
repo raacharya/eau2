@@ -5,6 +5,6 @@ set(CMAKE_CXX_STANDARD 14)
 
 #add_executable(server server.cpp)
 #add_executable(client client.cpp)
-add_executable(main main.cpp)
+add_executable(main build.cpp)
 add_executable(test test.cpp)
 
