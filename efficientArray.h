@@ -2,6 +2,7 @@
 #include "array.h"
 #include "string.h"
 #include <stdarg.h>
+#include "network.h"
 
 
 /** The efficient arr uses chunks to improve performance. We store fixed size arrays as these chunks and then have pointers to
@@ -658,5 +659,167 @@ class EffTypeArr : public Object {
             delete chunks[i];
           }
           delete[] chunks;
+        }
+};
+
+/*************************************************************************
+ * DistEffStrArr::
+ * Holds String values in distributed nodes. Is unmodifiable.
+ */
+class DistEffStrArr : public Distributable {
+    public:
+        size_t chunkSize;
+        size_t capacity;
+        size_t currentChunkIdx;
+        size_t numberOfElements;
+        FixedStrArray** chunks; // not needed when we implement networking
+        char* id;
+
+        DistEffStrArr(char* id_var) {
+            id = id_var;
+            chunkSize = 50; // getFromNode(id-chunkSize)
+            capacity = 1; // getFromNode(id-capacity)
+            currentChunkIdx = 0; // getFromNode(id-currentChunkSize)
+            numberOfElements = 0; // getFromNode(id-numberOfElements)
+
+            // in the future with networking, this will not exist
+            chunks = new FixedStrArray*[capacity];
+
+            for (int i = 0; i < capacity; i += 1) {
+                chunks[i] = new FixedStrArray(chunkSize);
+                // in the future, call super's sendToNode method
+            }
+        }
+
+        bool equals(Object* other) {
+            DistEffStrArr* o = dynamic_cast<DistEffStrArr *> (other);
+            if(o) {
+                for(size_t i = 0; i < numberOfElements; i++) {
+                    if(!get(i)->equals(o->get(i))) {
+                        return false;
+                    }
+                }
+            }
+            return numberOfElements == o->numberOfElements;
+        }
+
+        DistEffStrArr(EffStrArr& from, char* id_var) {
+            // this will basically send all the chunks to the various nodes
+            // as well as the metadata, essentially storing the data of this
+            // in the nodes
+            chunkSize = from.chunkSize;
+            capacity = from.capacity;
+            currentChunkIdx = from.currentChunkIdx;
+            numberOfElements = from.numberOfElements;
+            chunks = new FixedStrArray*[capacity];
+            for (int i = 0; i < capacity; i += 1) {
+                chunks[i] = new FixedStrArray(*from.chunks[i]);
+            }
+        }
+
+        String* get(size_t idx) {
+
+            size_t chunkIdx = idx / chunkSize;
+
+            // in the future, call super's getFromNode to grab the chunk
+            // and then cast to a FixedStrArr
+            return chunks[chunkIdx]->get(idx % chunkSize);
+        }
+
+        size_t size() {
+            return numberOfElements;
+        }
+
+        int indexOf(String* item) {
+            for (int i = 0; i <= currentChunkIdx; i += 1) {
+                int indexOf = chunks[i]->indexOf(item);
+                if (indexOf != -1) {
+                    return indexOf;
+                }
+            }
+            return -1;
+        }
+
+        ~DistEffStrArr() {
+            for (int i = 0; i < capacity; i += 1) {
+                delete chunks[i];
+            }
+            delete[] chunks;
+        }
+};
+
+/*************************************************************************
+ * DistEffCharArr::
+ * Holds Char values in distributed nodes. Is unmodifiable.
+ */
+class DistEffCharArr : public Distributable {
+    public:
+        size_t chunkSize;
+        size_t capacity;
+        size_t currentChunkIdx;
+        size_t numberOfElements;
+        FixedCharArray** chunks; // not needed when we implement networking
+        char* id;
+
+        DistEffCharArr(char* id_var) {
+            id = id_var;
+            chunkSize = 50; // getFromNode(id-chunkSize)
+            capacity = 1; // getFromNode(id-capacity)
+            currentChunkIdx = 0; // getFromNode(id-currentChunkSize)
+            numberOfElements = 0; // getFromNode(id-numberOfElements)
+
+            // in the future with networking, this will not exist
+            chunks = new FixedCharArray*[capacity];
+
+            for (int i = 0; i < capacity; i += 1) {
+                chunks[i] = new FixedCharArray(chunkSize);
+                // in the future, call super's sendToNode method
+            }
+        }
+
+        bool equals(Object* other) {
+            DistEffCharArr* o = dynamic_cast<DistEffCharArr *> (other);
+            if(o) {
+                for(size_t i = 0; i < numberOfElements; i++) {
+                    if(get(i) != o->get(i)) {
+                        return false;
+                    }
+                }
+            }
+            return numberOfElements == o->numberOfElements;
+        }
+
+        DistEffCharArr(EffCharArr& from, char* id_var) {
+            // this will basically send all the chunks to the various nodes
+            // as well as the metadata, essentially storing the data of this
+            // in the nodes
+            chunkSize = from.chunkSize;
+            capacity = from.capacity;
+            currentChunkIdx = from.currentChunkIdx;
+            numberOfElements = from.numberOfElements;
+            chunks = new FixedCharArray*[capacity];
+            for (int i = 0; i < capacity; i += 1) {
+                chunks[i] = new FixedCharArray(*from.chunks[i]);
+            }
+        }
+
+        char get(size_t idx) {
+
+            size_t chunkIdx = idx / chunkSize;
+
+            // in the future, call super's getFromNode to grab the chunk
+            // and then cast to a FixedStrArr
+            return chunks[chunkIdx]->get(idx % chunkSize);
+        }
+
+        size_t size() {
+            return numberOfElements;
+        }
+
+        ~DistEffCharArr() {
+            for (int i = 0; i < capacity; i += 1) {
+                delete chunks[i];
+            }
+            delete[] chunks;
         }
 };

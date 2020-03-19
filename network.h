@@ -13,6 +13,7 @@
 #include <poll.h>
 #include <iostream>
 #include "serial.h"
+#include "store.h"
 #include <thread>
 
 #define MAXDATASIZE 1024
@@ -333,4 +334,18 @@ class ClientSocket {
             }
         }
 
+};
+
+class Distributable : public Object {
+    public:
+
+        void sendToNode(Key key, Object value) {
+            // send the given key value store to the given node
+            // the node is the node of key
+        }
+
+        Object getFromNode(Key key) {
+            // send the given key value store to the given node
+            // the node is the node of key
+        }
 };

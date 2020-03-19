@@ -251,3 +251,87 @@ class DataFrame : public Object {
             delete schema;
         }
 };
+
+/****************************************************************************
+ * DistDataFrame::
+ *
+ * A DistDataFrame is a DataFrame which is distributed among many nodes
+ */
+class DistDataFrame : public Object {
+
+    public:
+
+        DistSchema *schema;
+        EffColArr *columns;
+        char* id;
+
+        DistDataFrame(char* id_var) {
+            id = id_var;
+            schema = new DistSchema(id);
+            // same for DistEffColArr
+        }
+
+        DistDataFrame(DataFrame &from, char* id_var) {
+            id = id_var;
+            schema = new DistSchema(*from.schema, id);
+            // same for DistEffColArr
+        }
+
+        /** Return the value at the given column and row. Accessing rows or
+         *  columns out of bounds, or request the wrong type throws an error.*/
+        int get_int(size_t col, size_t row) {
+            assert(0 <= col && col < schema->width());
+            assert(0 <= row && row < schema->length());
+            assert(columns->get(col)->get_type() == 'I');
+            return columns->get(col)->as_int()->get(row);
+        }
+        bool get_bool(size_t col, size_t row) {
+            assert(0 <= col && col < schema->width());
+            assert(0 <= row && row < schema->length());
+            assert(columns->get(col)->get_type() == 'B');
+            return columns->get(col)->as_bool()->get(row);
+        }
+
+        float get_float(size_t col, size_t row) {
+            assert(0 <= col && col < schema->width());
+            assert(0 <= row && row < schema->length());
+            assert(columns->get(col)->get_type() == 'F');
+            return columns->get(col)->as_float()->get(row);
+        }
+
+        String *get_string(size_t col, size_t row) {
+            assert(0 <= col && col < schema->width());
+            assert(0 <= row && row < schema->length());
+            assert(columns->get(col)->get_type() == 'S');
+            return columns->get(col)->as_string()->get(row);
+        }
+
+        /** Return the offset of the given column name or -1 if no such col. */
+        int get_col(String &col) {
+            return schema->col_idx(col.cstr_);
+        }
+
+        /** Return the offset of the given row name or -1 if no such row. */
+        int get_row(String &col) {
+            return schema->row_idx(col.cstr_);
+        }
+
+        /** The number of rows in the dataframe. */
+        size_t nrows() {
+            return schema->length();
+        }
+
+        /** The number of columns in the dataframe.*/
+        size_t ncols() {
+            return schema->width();
+        }
+
+        /**
+         * @brief Destroy the Data Frame object
+         *
+         */
+        ~DistDataFrame() {
+            delete columns;
+            delete schema;
+        }
+};

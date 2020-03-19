@@ -3,6 +3,7 @@
 #include "dataframe.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "store.h"
 
 #include "parser.h"
 
@@ -137,8 +138,8 @@ DataFrame* buildFromFile(int argc, char* argv[]) {
         parser.parseFile();
         ColumnSet* set = parser.getColumnSet();
 
-        Schema* s = new Schema();
-        DataFrame df(*s);
+        Schema s{};
+        DataFrame df(s);
 
         for(size_t i = 0; i < set->getLength(); i++) {
             BaseColumn* column = set->getColumn(i);
@@ -174,6 +175,7 @@ DataFrame* buildFromFile(int argc, char* argv[]) {
                 df.add_column(newCol, nullptr);
             }
         }
+        delete set;
 
         df.print();
         fclose(file);
@@ -189,5 +191,5 @@ DataFrame* buildFromFile(int argc, char* argv[]) {
  */
 int main(int argc, char* argv[]) {
     DataFrame* df = buildFromFile(argc, argv);
-    return 1;
+    return 0;
 }

@@ -15,8 +15,6 @@ class Schema : public Object {
         EffStrArr *rows;
         EffStrArr *columns;
         EffCharArr *types;
-        size_t rowCount;
-        size_t colCount;
 
         /** Copying constructor */
         Schema(Schema &from) : Object() {
@@ -106,6 +104,90 @@ class Schema : public Object {
         }
 
         ~Schema() {
+            delete rows;
+            delete columns;
+            delete types;
+        }
+};
+
+/*************************************************************************
+ * DistSchema::
+ * A DistSchema is a Schema which is distributed across the nodes of the network.
+ */
+class DistSchema : public Object {
+    public:
+
+        DistEffStrArr *rows;
+        DistEffStrArr *columns;
+        DistEffCharArr *types;
+        char* id;
+
+        /** Copying constructor */
+        DistSchema(Schema &from, char* id_var) : Object() {
+            id = id_var;
+            rows = new DistEffStrArr(*from.rows, id);
+            columns = new DistEffStrArr(*from.columns, id);
+            types = new DistEffCharArr(*from.types, id);
+
+        }
+
+        /** Create an empty schema **/
+        DistSchema(char* id_var) : Object() {
+            id = id_var;
+            rows = new DistEffStrArr(id);
+            columns = new DistEffStrArr(id);
+            types = new DistEffCharArr(id);
+        }
+
+        /** Return name of row at idx; nullptr indicates no name. An idx >= width
+          * is undefined. */
+        String *row_name(size_t idx) {
+            return rows->get(idx);
+        }
+
+        /** Return name of column at idx; nullptr indicates no name given.
+          *  An idx >= width is undefined.*/
+        String *col_name(size_t idx) {
+            return columns->get(idx);
+
+        }
+
+        /** Return type of column at idx. An idx >= width is undefined. */
+        char col_type(size_t idx) {
+            return types->get(idx);
+
+        }
+
+        /** Given a column name return its index, or -1. */
+        int col_idx(const char *name) {
+            assert(name != nullptr);
+            String *str = new String(name);
+            int indexOf = columns->indexOf(str);
+            delete str;
+            return indexOf;
+        }
+
+        /** Given a row name return its index, or -1. */
+        int row_idx(const char *name) {
+            assert(name != nullptr);
+            String *str = new String(name);
+            int indexOf = rows->indexOf(str);
+            delete str;
+            return indexOf;
+        }
+
+        /** The number of columns */
+        size_t width() {
+            return columns->size();
+
+        }
+
+        /** The number of rows */
+        size_t length() {
+            return rows->size();
+        }
+
+        ~DistSchema() {
             delete rows;
             delete columns;
             delete types;
