@@ -1,3 +1,5 @@
+#pragma once
+
 #include "object.h"
 #include "schema.h"
 #include "array.h"
@@ -262,19 +264,19 @@ class DistDataFrame : public Object {
     public:
 
         DistSchema *schema;
-        EffColArr *columns;
+        DistEffColArr *columns;
         char* id;
 
         DistDataFrame(char* id_var) {
             id = id_var;
             schema = new DistSchema(id);
-            // same for DistEffColArr
+            columns = new DistEffColArr(id);
         }
 
         DistDataFrame(DataFrame &from, char* id_var) {
             id = id_var;
             schema = new DistSchema(*from.schema, id);
-            // same for DistEffColArr
+            columns = new DistEffColArr(*from.columns, id);
         }
 
         /** Return the value at the given column and row. Accessing rows or

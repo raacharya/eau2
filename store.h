@@ -1,41 +1,23 @@
 #pragma once
 
 #include <map>
+#include "dataframe.h"
+#include "network.h"
 
 using namespace std;
-
-class Key : public Object {
-    public:
-        String* key;
-        int node;
-
-        Key(String* strKey, int homeNode) : Object() {
-            key = strKey;
-            node = homeNode;
-        }
-
-        bool equals(Object* o) {
-            if (o == this) return true;
-            Key* other = dynamic_cast<Key*>(o);
-            if (other == nullptr) return false;
-            return key->equals(other->key);
-        }
-
-        size_t hash_me() {
-            return key->hash_me();
-        }
-};
 
 class KDStore : public Object {
     public:
         int index;
-        map<Key, DataFrame*> store;
+        map<Key, DistDataFrame*> store;
 
         KDStore(int idx) : Object() {
             index = idx;
         }
 
-        DataFrame* get(Key key) {
+        DistDataFrame* get(Key key) {
+            return new DistDataFrame(key.key->c_str());
+
             if (key.node == index) {
                 return store.find(key)->second;
             }
@@ -43,14 +25,15 @@ class KDStore : public Object {
         }
 
         void put(Key key, DataFrame* df) {
-            if (key.node == index) {
-                store.at(key) = df;
-            }
-            // implement distributed part later
+            delete new DistDataFrame(*df, key.key->c_str());
         }
 
-        DataFrame* waitAndGet(Key key) {
-            // implement blocking when distributed part is done
-            return get(key);
+        DistDataFrame* waitAndGet(Key key) {
+            while (true) {
+                DistDataFrame* df = get(key);
+                if (df) {
+                    return df;
+                }
+            }
         }
 };

@@ -828,26 +828,29 @@ class EffColArr : public Object {
  * EffColArr::
  * Holds Columns
  */
-class DistEffColArr : public Object {
+class DistEffColArr : public Distributable {
     public:
-        size_t chunkSize = 50;
-        size_t capacity = 1;
-        size_t currentChunkIdx = 0;
-        size_t numberOfElements = 0;
+        size_t chunkSize;
+        size_t capacity;
+        size_t currentChunkIdx;
+        size_t numberOfElements;
         FixedColArray** chunks;
-
-        int numNodes;
+        char* id;
 
         /**
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffColArr(int numberNodes) {
+        DistEffColArr(char* id_var) {
+            chunkSize = 50; // getFromNode(id-chunkSize)
+            capacity = 1; // getFromNode(id-capacity)
+            currentChunkIdx = 0; // getFromNode(id-currentChunkSize)
+            numberOfElements = 0; // getFromNode(id-numberOfElements)
             chunks = new FixedColArray*[capacity];
             for (int i = 0; i < capacity; i += 1) {
                 chunks[i] = new FixedColArray(chunkSize);
             }
-            numNodes = numberNodes;
+            id = id_var;
         }
 
         /**
@@ -855,7 +858,7 @@ class DistEffColArr : public Object {
          *
          * @param from
          */
-        DistEffColArr(DistEffColArr& from) { // TODO fix this
+        DistEffColArr(EffColArr& from, char* id_var) {
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
@@ -864,42 +867,7 @@ class DistEffColArr : public Object {
             for (int i = 0; i < capacity; i += 1) {
                 chunks[i] = new FixedColArray(*from.chunks[i]);
             }
-        }
-
-        /**
-         * @brief Extend the size of this col array by copying pointers to chunks
-         *
-         */
-        void extendSize() { // TODO fix this
-            FixedColArray** newChunks = new FixedColArray*[capacity * 2];
-            int i = 0;
-            for (i; i < capacity; i += 1) {
-                newChunks[i] = chunks[i];
-            }
-            capacity *= 2;
-            for (i; i < capacity; i += 1) {
-                newChunks[i] = new FixedColArray(chunkSize);
-            }
-            delete[] chunks;
-            chunks = newChunks;
-        }
-
-        /**
-         * @brief add a column to this efficient col array
-         *
-         * @param value
-         */
-        void pushBack(Column* value) { // TODO fix this
-            FixedColArray* currentChunk = chunks[currentChunkIdx];
-            if (currentChunk->size() == currentChunk->numElements()) {
-                currentChunkIdx += 1;
-                if (currentChunkIdx == capacity) {
-                    extendSize();
-                }
-                currentChunk = chunks[currentChunkIdx];
-            }
-            currentChunk->pushBack(value);
-            numberOfElements += 1;
+            id = id_var;
         }
 
         /**
@@ -911,19 +879,10 @@ class DistEffColArr : public Object {
         Column* get(size_t idx) {
 
             size_t chunkIdx = idx / chunkSize;
-            int nodeOn = chunkIdx % numNodes;
-            Column toReturn;
-            // send request to node nodeOn to get Column at idx
-            // toReturn = getColumnFromNode(nodeOn, idx % chunkSize)
-            return &toReturn;
-        }
 
-
-        /** Set value at idx. An out of bound idx is undefined.  */
-        void set(size_t idx, Column* val) {
-            size_t chunkIdx = idx / chunkSize;
-
-            chunks[chunkIdx]->set(idx % chunkSize, val);
+            // in the future, call super's getFromNode to grab the chunk
+            // and then cast to a FixedColArr
+            return chunks[chunkIdx]->get(idx % chunkSize);
         }
 
         /**
@@ -955,7 +914,7 @@ class DistEffColArr : public Object {
          * @brief Destroy the Eff Col Arr object
          *
          */
-        ~EffColArr() {
+        ~DistEffColArr() {
             for (int i = 0; i < capacity; i += 1) {
                 delete chunks[i];
             }

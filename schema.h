@@ -1,6 +1,6 @@
 #pragma once
 
-#include "efficientArray.h"
+#include "network.h"
 
 /*************************************************************************
  * Schema::
