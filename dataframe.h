@@ -265,18 +265,24 @@ class DistDataFrame : public Object {
 
         DistSchema *schema;
         DistEffColArr *columns;
-        char* id;
+        String* id;
 
-        DistDataFrame(char* id_var) {
-            id = id_var;
+        DistDataFrame(String* id_var) {
+            id = id_var->clone();
+            id->concat("-df");
             schema = new DistSchema(id);
-            columns = new DistEffColArr(id);
+            String* cols_id = id->clone();
+            cols_id->concat("-cols");
+            columns = new DistEffColArr(cols_id);
         }
 
-        DistDataFrame(DataFrame &from, char* id_var) {
-            id = id_var;
+        DistDataFrame(DataFrame &from, String* id_var) {
+            id = id_var->clone();
+            id->concat("-df");
             schema = new DistSchema(*from.schema, id);
-            columns = new DistEffColArr(*from.columns, id);
+            String* cols_id = id->clone();
+            cols_id->concat("-cols");
+            columns = new DistEffColArr(*from.columns, cols_id);
         }
 
         /** Return the value at the given column and row. Accessing rows or

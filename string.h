@@ -83,6 +83,17 @@ class String : public Object {
                 hash = cstr_[i] + (hash << 6) + (hash << 16) - hash;
             return hash;
         }
+
+        /** Concat char* to this string. */
+        void concat(char* csr) {
+            size_t newSize = size_ + strlen(csr);
+            char* newCstr = new char[newSize];
+            strcpy(newCstr, cstr_);
+            strcat(newCstr, csr);
+            size_ = newSize;
+            cstr_ = newCstr;
+            delete cstr_;
+        }
 };
 
 /** A string buffer builds a string from various pieces.

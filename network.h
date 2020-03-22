@@ -367,8 +367,7 @@ class Distributable : public Object {
         map<Key, Object*> kvStore;
 
         void sendToNode(Key key, Object value) {
-            // send the given key value store to the given node
-            // the node is the node of key
+            kvStore[key] = &value;
         }
 
         Object getFromNode(Key key) {
@@ -390,11 +389,11 @@ class DistEffStrArr : public Distributable {
         size_t currentChunkIdx;
         size_t numberOfElements;
         FixedStrArray** chunks; // not needed when we implement networking
-        char* id;
+        String* id;
 
-        DistEffStrArr(char* id_var) {
+        DistEffStrArr(String* id_var) {
             id = id_var;
-            chunkSize = 50; // getFromNode(id-chunkSize)
+            chunkSize = getFromNode(id-chunkSize)
             capacity = 1; // getFromNode(id-capacity)
             currentChunkIdx = 0; // getFromNode(id-currentChunkSize)
             numberOfElements = 0; // getFromNode(id-numberOfElements)
@@ -420,7 +419,7 @@ class DistEffStrArr : public Distributable {
             return numberOfElements == o->numberOfElements;
         }
 
-        DistEffStrArr(EffStrArr& from, char* id_var) {
+        DistEffStrArr(EffStrArr& from, String* id_var) {
             // this will basically send all the chunks to the various nodes
             // as well as the metadata, essentially storing the data of this
             // in the nodes
@@ -477,9 +476,9 @@ class DistEffCharArr : public Distributable {
         size_t currentChunkIdx;
         size_t numberOfElements;
         FixedCharArray** chunks; // not needed when we implement networking
-        char* id;
+        String* id;
 
-        DistEffCharArr(char* id_var) {
+        DistEffCharArr(String* id_var) {
             id = id_var;
             chunkSize = 50; // getFromNode(id-chunkSize)
             capacity = 1; // getFromNode(id-capacity)
@@ -507,7 +506,7 @@ class DistEffCharArr : public Distributable {
             return numberOfElements == o->numberOfElements;
         }
 
-        DistEffCharArr(EffCharArr& from, char* id_var) {
+        DistEffCharArr(EffCharArr& from, String* id_var) {
             // this will basically send all the chunks to the various nodes
             // as well as the metadata, essentially storing the data of this
             // in the nodes
@@ -519,6 +518,7 @@ class DistEffCharArr : public Distributable {
             for (int i = 0; i < capacity; i += 1) {
                 chunks[i] = new FixedCharArray(*from.chunks[i]);
             }
+            id = id_var;
         }
 
         char get(size_t idx) {

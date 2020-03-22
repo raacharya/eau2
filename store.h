@@ -16,16 +16,11 @@ class KDStore : public Object {
         }
 
         DistDataFrame* get(Key key) {
-            return new DistDataFrame(key.key->c_str());
-
-            if (key.node == index) {
-                return store.find(key)->second;
-            }
-            // implement distributed part later
+            return new DistDataFrame(key.key);
         }
 
         void put(Key key, DataFrame* df) {
-            delete new DistDataFrame(*df, key.key->c_str());
+            delete new DistDataFrame(*df, key.key);
         }
 
         DistDataFrame* waitAndGet(Key key) {

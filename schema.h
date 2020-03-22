@@ -120,23 +120,37 @@ class DistSchema : public Object {
         DistEffStrArr *rows;
         DistEffStrArr *columns;
         DistEffCharArr *types;
-        char* id;
+        String* id;
 
         /** Copying constructor */
-        DistSchema(Schema &from, char* id_var) : Object() {
-            id = id_var;
-            rows = new DistEffStrArr(*from.rows, id);
-            columns = new DistEffStrArr(*from.columns, id);
-            types = new DistEffCharArr(*from.types, id);
+        DistSchema(Schema &from, String* id_var) : Object() {
+            id = id_var->clone();
+            id->concat("-schema");
+            String* rows_id = id->clone();
+            rows_id->concat("-rows");
+            rows = new DistEffStrArr(*from.rows, rows_id);
+            String* cols_id = id->clone();
+            rows_id->concat("-cols");
+            columns = new DistEffStrArr(*from.columns, cols_id);
+            String* types_id = id->clone();
+            rows_id->concat("-types");
+            types = new DistEffCharArr(*from.types, types_id);
 
         }
 
         /** Create an empty schema **/
-        DistSchema(char* id_var) : Object() {
-            id = id_var;
-            rows = new DistEffStrArr(id);
-            columns = new DistEffStrArr(id);
-            types = new DistEffCharArr(id);
+        DistSchema(String* id_var) : Object() {
+            id = id_var->clone();
+            id->concat("-schema");
+            String* rows_id = id->clone();
+            rows_id->concat("-rows");
+            rows = new DistEffStrArr(rows_id);
+            String* cols_id = id->clone();
+            rows_id->concat("-cols");
+            columns = new DistEffStrArr(cols_id);
+            String* types_id = id->clone();
+            rows_id->concat("-types");
+            types = new DistEffCharArr(types_id);
         }
 
         /** Return name of row at idx; nullptr indicates no name. An idx >= width
