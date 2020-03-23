@@ -80,7 +80,7 @@ int get_listener_socket(char* ip, char* port) {
 
         setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
 
-        if (bind(listener, p->ai_addr, p->ai_addrlen) < 0) {
+        if (::bind(listener, p->ai_addr, p->ai_addrlen) < 0) {
             close(listener);
             continue;
         }

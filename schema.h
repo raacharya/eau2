@@ -175,24 +175,6 @@ class DistSchema : public Object {
 
         }
 
-        /** Given a column name return its index, or -1. */
-        int col_idx(const char *name) {
-            assert(name != nullptr);
-            String *str = new String(name);
-            int indexOf = columns->indexOf(str);
-            delete str;
-            return indexOf;
-        }
-
-        /** Given a row name return its index, or -1. */
-        int row_idx(const char *name) {
-            assert(name != nullptr);
-            String *str = new String(name);
-            int indexOf = rows->indexOf(str);
-            delete str;
-            return indexOf;
-        }
-
         /** The number of columns */
         size_t width() {
             return columns->size();
