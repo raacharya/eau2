@@ -6,6 +6,7 @@
 #include "column.h"
 #include "row.h"
 #include "rower.h"
+#include "store.h"
 
 /****************************************************************************
  * DataFrame::
@@ -337,7 +338,7 @@ public:
          * @param vals - the values
          * @return
          */
-    static DistDataFrame* fromArray(Key* key, Distributable* kvstore, size_t size, float* vals) {
+    static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, float* vals) {
         FloatColumn* col = new FloatColumn();
         for(size_t i = 0; i < size; i++) {
             col->push_back(vals[i]);
@@ -347,7 +348,7 @@ public:
         DataFrame df(s);
         df.add_column(col, nullptr);
 
-        DistDataFrame* newDf = new DistDataFrame(df, key->key, kvstore);
+        DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
         return newDf;
     }
@@ -360,7 +361,7 @@ public:
      * @param vals - the values
      * @return
      */
-    static DistDataFrame* fromArray(Key* key, Distributable* kvstore, size_t size, int* vals) {
+    static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, int* vals) {
         IntColumn* col = new IntColumn();
         for(size_t i = 0; i < size; i++) {
             col->push_back(vals[i]);
@@ -370,7 +371,7 @@ public:
         DataFrame df(s);
         df.add_column(col, nullptr);
 
-        DistDataFrame* newDf = new DistDataFrame(df, key->key, kvstore);
+        DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
         return newDf;
     }
@@ -383,7 +384,7 @@ public:
      * @param vals - the values
      * @return
      */
-    static DistDataFrame* fromArray(Key* key, Distributable* kvstore, size_t size, bool* vals) {
+    static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, bool* vals) {
         BoolColumn* col = new BoolColumn();
         for(size_t i = 0; i < size; i++) {
             col->push_back(vals[i]);
@@ -393,7 +394,7 @@ public:
         DataFrame df(s);
         df.add_column(col, nullptr);
 
-        DistDataFrame* newDf = new DistDataFrame(df, key->key, kvstore);
+        DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
         return newDf;
     }
@@ -406,7 +407,7 @@ public:
      * @param vals - the values
      * @return
      */
-    static DistDataFrame* fromArray(Key* key, Distributable* kvstore, size_t size, String** vals) {
+    static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, String** vals) {
         StringColumn* col = new StringColumn();
         for(size_t i = 0; i < size; i++) {
             col->push_back(vals[i]);
@@ -416,7 +417,7 @@ public:
         DataFrame df(s);
         df.add_column(col, nullptr);
 
-        DistDataFrame* newDf = new DistDataFrame(df, key->key, kvstore);
+        DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
         return newDf;
     }

@@ -1,6 +1,7 @@
 #include "serial.h"
 #include "schema.h"
 #include "dataframe.h"
+#include "application.h"
 #include <stdio.h>
 
 /**
@@ -114,11 +115,11 @@ void testMessage() {
  * @return
  */
 int main(int argc, char** argv) {
-    testFloat();
-    testSizeT();
-    testStringArr();
-    testFloatArr();
-    testMessage();
-
-    std::cout << "ALL PASSED";
+//    testFloat();
+//    testSizeT();
+//    testStringArr();
+//    testFloatArr();
+//    testMessage();
+//
+//    std::cout << "ALL PASSED";
 }

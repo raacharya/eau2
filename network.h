@@ -345,8 +345,8 @@ class Key : public Object {
         String* key;
         int node;
 
-        Key(String* strKey, int homeNode) : Object() {
-            key = strKey;
+        Key(char* strKey, int homeNode) : Object() {
+            key = new String(strKey);
             node = homeNode;
         }
 
