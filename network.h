@@ -360,21 +360,33 @@ class Key : public Object {
         size_t hash_me() {
             return key->hash_me();
         }
+
+        ~Key() {
+            delete key;
+        };
+};
+
+union Value {
+    size_t st;
+    Object* obj;
 };
 
 class Distributable : public Object {
     public:
-        map<Key, Object*> kvStore;
+        map<String*, Value*> kvStore;
+        int index;
 
-        void sendToNode(Key key, Object value) {
-            kvStore[key] = &value;
+        Distributable(int index_var) {
+            index = index_var;
         }
 
-        Object getFromNode(Key key) {
-            Object* val = kvStore.find(key)->second;
-            if (val == nullptr) {
-                // send a request to the other nodes
-            }
+        void sendToNode(Key* key, Value* value) {
+            kvStore[key->key] = value;
+        }
+
+        Value* getFromNode(Key* key) {
+            Value* val = kvStore.find(key->key)->second;
+            return val;
         }
 };
 
@@ -382,29 +394,30 @@ class Distributable : public Object {
  * DistEffStrArr::
  * Holds String values in distributed nodes. Is unmodifiable.
  */
-class DistEffStrArr : public Distributable {
+class DistEffStrArr : public Object {
     public:
         size_t chunkSize;
         size_t capacity;
         size_t currentChunkIdx;
         size_t numberOfElements;
-        FixedStrArray** chunks; // not needed when we implement networking
         String* id;
+        Distributable* kvStore;
 
-        DistEffStrArr(String* id_var) {
+        DistEffStrArr(String* id_var, Distributable* kvStore_var) {
             id = id_var;
-            chunkSize = getFromNode(id-chunkSize)
-            capacity = 1; // getFromNode(id-capacity)
-            currentChunkIdx = 0; // getFromNode(id-currentChunkSize)
-            numberOfElements = 0; // getFromNode(id-numberOfElements)
+            kvStore = kvStore_var;
+            chunkSize = getSizeTFromKey("chunkSize");
+            capacity = getSizeTFromKey("capacity");
+            currentChunkIdx = getSizeTFromKey("currentChunk");
+            numberOfElements = getSizeTFromKey("numElements");
+        }
 
-            // in the future with networking, this will not exist
-            chunks = new FixedStrArray*[capacity];
-
-            for (int i = 0; i < capacity; i += 1) {
-                chunks[i] = new FixedStrArray(chunkSize);
-                // in the future, call super's sendToNode method
-            }
+        size_t getSizeTFromKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            Key* sizeTKey = new Key(idClone, 0);
+            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
+            delete sizeTKey;
         }
 
         bool equals(Object* other) {
@@ -419,57 +432,76 @@ class DistEffStrArr : public Distributable {
             return numberOfElements == o->numberOfElements;
         }
 
-        DistEffStrArr(EffStrArr& from, String* id_var) {
+        DistEffStrArr(EffStrArr& from, String* id_var, Distributable* kvStore_var) {
             // this will basically send all the chunks to the various nodes
             // as well as the metadata, essentially storing the data of this
             // in the nodes
+            kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
-            chunks = new FixedStrArray*[capacity];
-            for (int i = 0; i < capacity; i += 1) {
-                chunks[i] = new FixedStrArray(*from.chunks[i]);
+
+            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
+            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
+            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            for (size_t i = 0; i < capacity; i += 1) {
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]));
             }
             id = id_var;
         }
 
+        size_t length(size_t s) {
+            size_t len = 1;
+            s = s / 10;
+            while (s) {
+                s = s / 10;
+                len += 1;
+            }
+            return len;
+        }
+
+        Key* createKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            return new Key(idClone, 0);
+        }
+
+        Value* createValue(size_t s) {
+            Value* val = new Value();
+            val->st = s;
+            return val;
+        }
+
+        Value* createValue(FixedStrArray* fixedStrArray) {
+            Value* val = new Value();
+            val->obj = fixedStrArray;
+            return val;
+        }
+
         String* get(size_t idx) {
-
             size_t chunkIdx = idx / chunkSize;
-
-            // in the future, call super's getFromNode to grab the chunk
-            // and then cast to a FixedStrArr
-            return chunks[chunkIdx]->get(idx % chunkSize);
+            char* buf = new char[length(idx) + 1];
+            sprintf(buf, "%zu", idx);
+            FixedStrArray* curChunk = dynamic_cast<FixedStrArray*>(kvStore->getFromNode(createKey(buf))->obj);
+            return curChunk->get(idx % chunkSize);
         }
 
         size_t size() {
             return numberOfElements;
         }
 
-        int indexOf(String* item) {
-            for (int i = 0; i <= currentChunkIdx; i += 1) {
-                int indexOf = chunks[i]->indexOf(item);
-                if (indexOf != -1) {
-                    return indexOf;
-                }
-            }
-            return -1;
-        }
-
-        ~DistEffStrArr() {
-            for (int i = 0; i < capacity; i += 1) {
-                delete chunks[i];
-            }
-            delete[] chunks;
-        }
+        ~DistEffStrArr() {}
 };
 
 /*************************************************************************
  * DistEffCharArr::
  * Holds Char values in distributed nodes. Is unmodifiable.
  */
-class DistEffCharArr : public Distributable {
+class DistEffCharArr : public Object {
     public:
         size_t chunkSize;
         size_t capacity;
@@ -477,9 +509,11 @@ class DistEffCharArr : public Distributable {
         size_t numberOfElements;
         FixedCharArray** chunks; // not needed when we implement networking
         String* id;
+        Distributable* kvStore;
 
-        DistEffCharArr(String* id_var) {
+        DistEffCharArr(String* id_var, Distributable* kvStore_var) {
             id = id_var;
+            kvStore = kvStore_var;
             chunkSize = 50; // getFromNode(id-chunkSize)
             capacity = 1; // getFromNode(id-capacity)
             currentChunkIdx = 0; // getFromNode(id-currentChunkSize)
@@ -506,10 +540,11 @@ class DistEffCharArr : public Distributable {
             return numberOfElements == o->numberOfElements;
         }
 
-        DistEffCharArr(EffCharArr& from, String* id_var) {
+        DistEffCharArr(EffCharArr& from, String* id_var, Distributable* kvStore_var) {
             // this will basically send all the chunks to the various nodes
             // as well as the metadata, essentially storing the data of this
             // in the nodes
+            kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;

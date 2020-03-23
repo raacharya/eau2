@@ -266,23 +266,26 @@ class DistDataFrame : public Object {
         DistSchema *schema;
         DistEffColArr *columns;
         String* id;
+        Distributable* kvStore;
 
-        DistDataFrame(String* id_var) {
+        DistDataFrame(String* id_var, Distributable* kvStore_var) {
+            kvStore = kvStore_var;
             id = id_var->clone();
             id->concat("-df");
-            schema = new DistSchema(id);
+            schema = new DistSchema(id, kvStore);
             String* cols_id = id->clone();
             cols_id->concat("-cols");
-            columns = new DistEffColArr(cols_id);
+            columns = new DistEffColArr(cols_id, kvStore);
         }
 
-        DistDataFrame(DataFrame &from, String* id_var) {
+        DistDataFrame(DataFrame &from, String* id_var, Distributable* kvStore_var) {
+            kvStore = kvStore_var;
             id = id_var->clone();
             id->concat("-df");
-            schema = new DistSchema(*from.schema, id);
+            schema = new DistSchema(*from.schema, id, kvStore);
             String* cols_id = id->clone();
             cols_id->concat("-cols");
-            columns = new DistEffColArr(*from.columns, cols_id);
+            columns = new DistEffColArr(*from.columns, cols_id, kvStore);
         }
 
         /** Return the value at the given column and row. Accessing rows or

@@ -9,18 +9,20 @@ using namespace std;
 class KDStore : public Object {
     public:
         int index;
-        map<Key, DistDataFrame*> store;
+        Distributable* kvStore;
+
 
         KDStore(int idx) : Object() {
             index = idx;
+            kvStore = new Distributable(index);
         }
 
         DistDataFrame* get(Key key) {
-            return new DistDataFrame(key.key);
+            return new DistDataFrame(key.key, kvStore);
         }
 
         void put(Key key, DataFrame* df) {
-            delete new DistDataFrame(*df, key.key);
+            delete new DistDataFrame(*df, key.key, kvStore);
         }
 
         DistDataFrame* waitAndGet(Key key) {

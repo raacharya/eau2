@@ -828,7 +828,7 @@ class EffColArr : public Object {
  * EffColArr::
  * Holds Columns
  */
-class DistEffColArr : public Distributable {
+class DistEffColArr : public Object {
     public:
         size_t chunkSize;
         size_t capacity;
@@ -836,12 +836,14 @@ class DistEffColArr : public Distributable {
         size_t numberOfElements;
         FixedColArray** chunks;
         String* id;
+        Distributable* kvStore;
 
         /**
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffColArr(String* id_var) {
+        DistEffColArr(String* id_var, Distributable* kvStore_var) {
+            kvStore = kvStore_var;
             chunkSize = 50; // getFromNode(id-chunkSize)
             capacity = 1; // getFromNode(id-capacity)
             currentChunkIdx = 0; // getFromNode(id-currentChunkSize)
@@ -858,7 +860,8 @@ class DistEffColArr : public Distributable {
          *
          * @param from
          */
-        DistEffColArr(EffColArr& from, String* id_var) {
+        DistEffColArr(EffColArr& from, String* id_var, Distributable* kvStore_var) {
+            kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;

@@ -121,36 +121,39 @@ class DistSchema : public Object {
         DistEffStrArr *columns;
         DistEffCharArr *types;
         String* id;
+        Distributable* kvStore;
 
         /** Copying constructor */
-        DistSchema(Schema &from, String* id_var) : Object() {
+        DistSchema(Schema &from, String* id_var, Distributable* kvStore_var) : Object() {
+            kvStore = kvStore_var;
             id = id_var->clone();
             id->concat("-schema");
             String* rows_id = id->clone();
             rows_id->concat("-rows");
-            rows = new DistEffStrArr(*from.rows, rows_id);
+            rows = new DistEffStrArr(*from.rows, rows_id, kvStore);
             String* cols_id = id->clone();
             rows_id->concat("-cols");
-            columns = new DistEffStrArr(*from.columns, cols_id);
+            columns = new DistEffStrArr(*from.columns, cols_id, kvStore);
             String* types_id = id->clone();
             rows_id->concat("-types");
-            types = new DistEffCharArr(*from.types, types_id);
+            types = new DistEffCharArr(*from.types, types_id, kvStore);
 
         }
 
         /** Create an empty schema **/
-        DistSchema(String* id_var) : Object() {
+        DistSchema(String* id_var, Distributable* kvStore_var) : Object() {
+            kvStore = kvStore_var;
             id = id_var->clone();
             id->concat("-schema");
             String* rows_id = id->clone();
             rows_id->concat("-rows");
-            rows = new DistEffStrArr(rows_id);
+            rows = new DistEffStrArr(rows_id, kvStore);
             String* cols_id = id->clone();
             rows_id->concat("-cols");
-            columns = new DistEffStrArr(cols_id);
+            columns = new DistEffStrArr(cols_id, kvStore);
             String* types_id = id->clone();
             rows_id->concat("-types");
-            types = new DistEffCharArr(types_id);
+            types = new DistEffCharArr(types_id, kvStore);
         }
 
         /** Return name of row at idx; nullptr indicates no name. An idx >= width
