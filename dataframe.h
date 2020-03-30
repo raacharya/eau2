@@ -7,6 +7,8 @@
 #include "row.h"
 #include "rower.h"
 
+class KDStore;
+
 /****************************************************************************
  * DataFrame::
  *
@@ -337,6 +339,14 @@ class DistDataFrame : public Object {
             delete columns;
             delete schema;
         }
+
+        static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, bool *vals);
+
+        static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, float *vals);
+
+        static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, String **vals);
+
+        static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, int *vals);
 };
 
 class KDStore : public Object {
@@ -350,22 +360,11 @@ class KDStore : public Object {
             kvStore = new Distributable(index);
         }
 
-        DistDataFrame* get(Key& key) {
-            return new DistDataFrame(key.key, kvStore);
-        }
+        DistDataFrame *get(Key &key);
 
-        void put(Key& key, DataFrame* df) {
-            delete new DistDataFrame(*df, key.key, kvStore);
-        }
+        void put(Key &key, DataFrame *df);
 
-        DistDataFrame* waitAndGet(Key& key) {
-            while (true) {
-                DistDataFrame* df = get(key);
-                if (df) {
-                    return df;
-                }
-            }
-        }
+        DistDataFrame *waitAndGet(Key &key);
 };
 
 /**
@@ -376,8 +375,23 @@ class KDStore : public Object {
  * @param vals - the values
  * @return
  */
-static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, int* vals) {
+DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, int* vals) {
     IntColumn* col = new IntColumn();
+    for(size_t i = 0; i < size; i++) {
+        col->push_back(vals[i]);
+    }
+
+    Schema s{};
+    DataFrame df(s);
+    df.add_column(col, nullptr);
+
+    DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
+
+    return newDf;
+}
+
+DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, float* vals) {
+    FloatColumn* col = new FloatColumn();
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
@@ -399,7 +413,7 @@ static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, int* va
  * @param vals - the values
  * @return
  */
-static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, bool* vals) {
+DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, bool* vals) {
     BoolColumn* col = new BoolColumn();
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
@@ -422,7 +436,7 @@ static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, bool* v
  * @param vals - the values
  * @return
  */
-static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, String** vals) {
+DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, String** vals) {
     StringColumn* col = new StringColumn();
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
@@ -435,5 +449,22 @@ static DistDataFrame* fromArray(Key* key, KDStore* kdStore, size_t size, String*
     DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
     return newDf;
+}
+
+DistDataFrame* KDStore::get(Key& key) {
+    return new DistDataFrame(key.key, kvStore);
+}
+
+void KDStore::put(Key& key, DataFrame* df) {
+    delete new DistDataFrame(*df, key.key, kvStore);
+}
+
+DistDataFrame* KDStore::waitAndGet(Key& key) {
+    while (true) {
+        DistDataFrame* df = get(key);
+        if (df) {
+            return df;
+        }
+    }
 }
 

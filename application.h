@@ -27,7 +27,7 @@ class Trivial : public Application {
             float sum = 0;
             for (size_t i = 0; i < SZ; ++i) sum += vals[i] = i;
             Key key("triv",0);
-            DistDataFrame* df = fromArray(&key, &kd, SZ, vals);
+            DistDataFrame* df = DistDataFrame::fromArray(&key, &kd, SZ, vals);
             assert(df->get_float(0,1) == 1);
             DistDataFrame* df2 = kd.get(key);
             for (size_t i = 0; i < SZ; ++i) sum -= df2->get_float(0,i);
