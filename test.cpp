@@ -122,4 +122,6 @@ int main(int argc, char** argv) {
 //    testMessage();
 //
 //    std::cout << "ALL PASSED";
+    Trivial triv(0);
+    triv.run_();
 }

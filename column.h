@@ -599,7 +599,7 @@ class FixedColArray : public Object {
          * @param from 
          */
         FixedColArray(FixedColArray& from) : FixedColArray(from.size()) {
-            for (int i = 0; i < from.size(); i += 1) {
+            for (int i = 0; i < from.numElements(); i += 1) {
                 Column* col = from.get(i);
                 Column* copy = new Column(*col);
                 set(i, copy);

@@ -441,6 +441,7 @@ class DistEffStrArr : public Object {
             // this will basically send all the chunks to the various nodes
             // as well as the metadata, essentially storing the data of this
             // in the nodes
+            id = id_var;
             kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
@@ -456,7 +457,6 @@ class DistEffStrArr : public Object {
                 sprintf(buf, "%zu", i);
                 kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]));
             }
-            id = id_var;
         }
 
         size_t length(size_t s) {
