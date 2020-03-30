@@ -294,40 +294,22 @@ class DistDataFrame : public Object {
         /** Return the value at the given column and row. Accessing rows or
          *  columns out of bounds, or request the wrong type throws an error.*/
         int get_int(size_t col, size_t row) {
-            assert(0 <= col && col < schema->width());
-            assert(0 <= row && row < schema->length());
             assert(columns->get(col)->get_type() == 'I');
             return columns->get(col)->as_int()->get(row);
         }
         bool get_bool(size_t col, size_t row) {
-            assert(0 <= col && col < schema->width());
-            assert(0 <= row && row < schema->length());
             assert(columns->get(col)->get_type() == 'B');
             return columns->get(col)->as_bool()->get(row);
         }
 
         float get_float(size_t col, size_t row) {
-            assert(0 <= col && col < schema->width());
-            assert(0 <= row && row < schema->length());
             assert(columns->get(col)->get_type() == 'F');
             return columns->get(col)->as_float()->get(row);
         }
 
         String *get_string(size_t col, size_t row) {
-            assert(0 <= col && col < schema->width());
-            assert(0 <= row && row < schema->length());
             assert(columns->get(col)->get_type() == 'S');
             return columns->get(col)->as_string()->get(row);
-        }
-
-        /** The number of rows in the dataframe. */
-        size_t nrows() {
-            return schema->length();
-        }
-
-        /** The number of columns in the dataframe.*/
-        size_t ncols() {
-            return schema->width();
         }
 
 

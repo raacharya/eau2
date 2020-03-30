@@ -124,4 +124,5 @@ int main(int argc, char** argv) {
 //    std::cout << "ALL PASSED";
     Trivial triv(0);
     triv.run_();
+    return 0;
 }

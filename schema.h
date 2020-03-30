@@ -117,8 +117,6 @@ class Schema : public Object {
 class DistSchema : public Object {
     public:
 
-        DistEffStrArr *rows;
-        DistEffStrArr *columns;
         DistEffCharArr *types;
         String* id;
         Distributable* kvStore;
@@ -128,14 +126,8 @@ class DistSchema : public Object {
             kvStore = kvStore_var;
             id = id_var->clone();
             id->concat("-schema");
-            String* rows_id = id->clone();
-            rows_id->concat("-rows");
-            rows = new DistEffStrArr(*from.rows, rows_id, kvStore);
-            String* cols_id = id->clone();
-            rows_id->concat("-cols");
-            columns = new DistEffStrArr(*from.columns, cols_id, kvStore);
             String* types_id = id->clone();
-            rows_id->concat("-types");
+            types_id->concat("-types");
             types = new DistEffCharArr(*from.types, types_id, kvStore);
 
         }
@@ -145,28 +137,9 @@ class DistSchema : public Object {
             kvStore = kvStore_var;
             id = id_var->clone();
             id->concat("-schema");
-            String* rows_id = id->clone();
-            rows_id->concat("-rows");
-            rows = new DistEffStrArr(rows_id, kvStore);
-            String* cols_id = id->clone();
-            rows_id->concat("-cols");
-            columns = new DistEffStrArr(cols_id, kvStore);
             String* types_id = id->clone();
-            rows_id->concat("-types");
+            types_id->concat("-types");
             types = new DistEffCharArr(types_id, kvStore);
-        }
-
-        /** Return name of row at idx; nullptr indicates no name. An idx >= width
-          * is undefined. */
-        String *row_name(size_t idx) {
-            return rows->get(idx);
-        }
-
-        /** Return name of column at idx; nullptr indicates no name given.
-          *  An idx >= width is undefined.*/
-        String *col_name(size_t idx) {
-            return columns->get(idx);
-
         }
 
         /** Return type of column at idx. An idx >= width is undefined. */
@@ -175,20 +148,7 @@ class DistSchema : public Object {
 
         }
 
-        /** The number of columns */
-        size_t width() {
-            return columns->size();
-
-        }
-
-        /** The number of rows */
-        size_t length() {
-            return rows->size();
-        }
-
         ~DistSchema() {
-            delete rows;
-            delete columns;
             delete types;
         }
 };

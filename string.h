@@ -39,7 +39,8 @@ class String : public Object {
                 Object(from) {
             size_ = from.size_;
             cstr_ = new char[size_ + 1]; // ensure that we copy the terminator
-            memcpy(cstr_, from.cstr_, size_ + 1);
+            memcpy(cstr_, from.cstr_, size_);
+            cstr_[size_] = '\0';
         }
 
         /** Delete the string */
@@ -86,13 +87,14 @@ class String : public Object {
 
         /** Concat char* to this string. */
         void concat(char* csr) {
-            size_t newSize = size_ + strlen(csr);
+            size_t newSize = size_ + strlen(csr) + 1;
             char* newCstr = new char[newSize];
             strcpy(newCstr, cstr_);
             strcat(newCstr, csr);
-            size_ = newSize;
-            cstr_ = newCstr;
+            size_ = newSize - 1;
+            newCstr[size_] = '\0';
             delete cstr_;
+            cstr_ = newCstr;
         }
 };
 

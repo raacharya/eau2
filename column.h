@@ -601,9 +601,24 @@ class FixedColArray : public Object {
         FixedColArray(FixedColArray& from) : FixedColArray(from.size()) {
             for (int i = 0; i < from.numElements(); i += 1) {
                 Column* col = from.get(i);
-                Column* copy = new Column(*col);
-                set(i, copy);
+                if (col->get_type() == 'I') {
+                    IntColumn* copy = new IntColumn(*col->as_int());
+                    set(i, copy);
+                } else if (col->get_type() == 'F') {
+                    FloatColumn* copy = new FloatColumn(*col->as_float());
+                    set(i, copy);
+                } else if (col->get_type() == 'B') {
+                    BoolColumn* copy = new BoolColumn(*col->as_bool());
+                    set(i, copy);
+                } else {
+                    StringColumn* copy = new StringColumn(*col->as_string());
+                    set(i, copy);
+                }
             }
+        }
+
+        FixedColArray* clone() {
+            return new FixedColArray(*this);
         }
 
 
@@ -843,16 +858,20 @@ class DistEffColArr : public Object {
          *
          */
         DistEffColArr(String* id_var, Distributable* kvStore_var) {
-            kvStore = kvStore_var;
-            chunkSize = 50; // getFromNode(id-chunkSize)
-            capacity = 1; // getFromNode(id-capacity)
-            currentChunkIdx = 0; // getFromNode(id-currentChunkSize)
-            numberOfElements = 0; // getFromNode(id-numberOfElements)
-            chunks = new FixedColArray*[capacity];
-            for (int i = 0; i < capacity; i += 1) {
-                chunks[i] = new FixedColArray(chunkSize);
-            }
             id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = getSizeTFromKey("chunkSize");
+            capacity = getSizeTFromKey("capacity");
+            currentChunkIdx = getSizeTFromKey("currentChunk");
+            numberOfElements = getSizeTFromKey("numElements");
+        }
+
+        size_t getSizeTFromKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            Key* sizeTKey = new Key(idClone, 0);
+            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
+            delete sizeTKey;
         }
 
         /**
@@ -861,16 +880,51 @@ class DistEffColArr : public Object {
          * @param from
          */
         DistEffColArr(EffColArr& from, String* id_var, Distributable* kvStore_var) {
+            id = id_var;
             kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
-            chunks = new FixedColArray*[capacity];
-            for (int i = 0; i < capacity; i += 1) {
-                chunks[i] = new FixedColArray(*from.chunks[i]);
+
+
+            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
+            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
+            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            for (size_t i = 0; i < capacity; i += 1) {
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
             }
-            id = id_var;
+        }
+
+        size_t length(size_t s) {
+            size_t len = 1;
+            s = s / 10;
+            while (s) {
+                s = s / 10;
+                len += 1;
+            }
+            return len;
+        }
+
+        Key* createKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            return new Key(idClone, 0);
+        }
+
+        Value* createValue(size_t s) {
+            Value* val = new Value;
+            val->st = s;
+            return val;
+        }
+
+        Value* createValue(FixedColArray* fixedStrArray) {
+            Value* val = new Value;
+            val->obj = fixedStrArray;
+            return val;
         }
 
         /**
@@ -880,12 +934,13 @@ class DistEffColArr : public Object {
          * @return Column*
          */
         Column* get(size_t idx) {
-
             size_t chunkIdx = idx / chunkSize;
-
-            // in the future, call super's getFromNode to grab the chunk
-            // and then cast to a FixedColArr
-            return chunks[chunkIdx]->get(idx % chunkSize);
+            char* buf = new char[length(idx) + 1];
+            sprintf(buf, "%zu", idx);
+            Value* val = kvStore->getFromNode(createKey(buf));
+            Object* obj = val->obj;
+            FixedColArray* curChunk = dynamic_cast<FixedColArray*>(obj);
+            return curChunk->get(idx % chunkSize);
         }
 
         /**
@@ -898,29 +953,9 @@ class DistEffColArr : public Object {
         }
 
         /**
-         * @brief get the index of the item in this col array
-         *
-         * @param item
-         * @return int
-         */
-        int indexOf(Column* item) {
-            for (int i = 0; i <= currentChunkIdx; i += 1) {
-                int indexOf = chunks[i]->indexOf(item);
-                if (indexOf != -1) {
-                    return indexOf;
-                }
-            }
-            return -1;
-        }
-
-        /**
          * @brief Destroy the Eff Col Arr object
          *
          */
         ~DistEffColArr() {
-            for (int i = 0; i < capacity; i += 1) {
-                delete chunks[i];
-            }
-            delete[] chunks;
         }
 };

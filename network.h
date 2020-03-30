@@ -12,7 +12,6 @@
 #include <arpa/inet.h>
 #include <poll.h>
 #include <iostream>
-//#include "store.h"
 #include "serial.h"
 #include "efficientArray.h"
 #include <thread>
@@ -378,7 +377,7 @@ union Value {
 
 class Distributable : public Object {
     public:
-        map<String*, Value*> kvStore;
+        map<std::string, Value*> kvStore;
         int index;
 
         Distributable(int index_var) {
@@ -386,12 +385,16 @@ class Distributable : public Object {
         }
 
         void sendToNode(Key* key, Value* value) {
-            kvStore[key->key] = value;
+            kvStore[std::string(key->key->c_str())] = value;
         }
 
         Value* getFromNode(Key* key) {
-            Value* val = kvStore.find(key->key)->second;
+            Value* val = kvStore.find(std::string(key->key->c_str()))->second;
             return val;
+        }
+
+        ~Distributable() {
+
         }
 };
 
@@ -476,13 +479,13 @@ class DistEffStrArr : public Object {
         }
 
         Value* createValue(size_t s) {
-            Value* val = new Value();
+            Value* val = new Value;
             val->st = s;
             return val;
         }
 
         Value* createValue(FixedStrArray* fixedStrArray) {
-            Value* val = new Value();
+            Value* val = new Value;
             val->obj = fixedStrArray;
             return val;
         }
