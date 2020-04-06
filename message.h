@@ -78,3 +78,38 @@ class Directory : public Message {
             kind_ = MsgKind::Directory;
         }
 };
+
+class Get : public Message {
+    public:
+        char* type; // one of 'I', 'F', 'B', 'S'
+        char* key;
+
+        Get(char* type_, char* key_) {
+            type = type_;
+            key = key_;
+            kind_ = MsgKind::Get;
+        }
+};
+
+/**
+ * @brief A union for each type of fixed array
+ *
+ */
+
+union Chunk  {
+    FixedIntArray* fi;
+    FixedIntArray* ff;
+    FixedBoolArray* fb;
+    FixedStrArray* fs;
+};
+
+class Send : public Message {
+    public:
+        Chunk c;
+        char* type;
+
+        Send(Chunk c_, char* type_) {
+            c = c_;
+            type = type_;
+        }
+};
