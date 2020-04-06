@@ -7,6 +7,7 @@
 #include "message.h"
 #include "msgKind.h"
 #include <stdlib.h>
+#include <sstream>
 
 /**
  * Serializes different values of various data types. Makes the networking layer more efficient.
@@ -49,7 +50,7 @@ public:
         return buffer;
     }
 
-    /**
+    /**buffer[];
      * Serializes a fixed string array
      * @param arr - the array
      * @return
@@ -230,42 +231,76 @@ public:
      * @return - the serialized message
      */
     char* serialize(Message* m) {
-
-        char* prefix = "ACK";
-        char* sender = serialize(m->sender_);
-        char* target = serialize(m->target_);
-        char* id = serialize(m->id_);
-
-        size_t bufferSize = strlen(prefix) + strlen(sender) + strlen(target) + strlen(id) + 1;
-
-        char* buffer = new char[bufferSize];
-
-        size_t index = 0;
-
-        buffer[index] = strlen(prefix);
-        index += 1;
-
-        for(size_t i = 0; i < strlen(prefix); i++) {
-            buffer[index] = prefix[i];
-            index += 1;
+        if (m->kind_ == MsgKind::Directory) {
+            char* buf = serializeDirectory(dynamic_cast<Directory*>(m));
+            return buf;
+        } else if (m->kind_ == MsgKind::Register) {
+            char* buf = serializeRegister(dynamic_cast<Register*>(m));
+            return buf;
         }
+    }
 
-        for(size_t i = 0; i < strlen(sender); i++) {
-            buffer[index] = sender[i];
-            index += 1;
-        }
-
-        for(size_t i = 0; i < strlen(target); i++) {
-            buffer[index] = target[i];
-            index += 1;
-        }
-
-        for(size_t i = 0; i < strlen(id); i++) {
-            buffer[index] = id[i];
-            index += 1;
-        }
-
+    char* serializeRegister(Register* m) {
+        std::ostringstream os;
+        os<<"R";
+        os<<len(m->sender_);
+        os<<"|";
+        os<<m->sender_;
+        os<<len(m->target_);
+        os<<"|";
+        os<<m->target_;
+        os<<len(m->id_);
+        os<<"|";
+        os<<m->id_;
+        os<<strlen(m->client);
+        os<<"|";
+        os<<m->client;
+        os<<len(m->port);
+        os<<"|";
+        os<<m->port;
+        std::string data = os.str();
+        char* buffer = strdup(data.c_str());
         return buffer;
+    }
+
+    char* serializeDirectory(Directory* m) {
+        std::ostringstream os;
+        os<<"D";
+        os<<len(m->sender_);
+        os<<"|";
+        os<<m->sender_;
+        os<<len(m->target_);
+        os<<"|";
+        os<<m->target_;
+        os<<len(m->id_);
+        os<<"|";
+        os<<m->id_;
+        os<<len(m->clients);
+        os<<"|";
+        os<<m->clients;
+        for (size_t i = 0; i < m->clients; i += 1) {
+            os<<len(m->ports[i]);
+            os<<"|";
+            os<<m->ports[i];
+        }
+        for (size_t i = 0; i < m->clients; i += 1) {
+            os<<m->addresses[i]->size();
+            os<<"|";
+            os<<m->addresses[i]->c_str();
+        }
+        std::string data = os.str();
+        char* buffer = strdup(data.c_str());
+        return buffer;
+    }
+
+    size_t len(size_t num) {
+        size_t len = 1;
+        num /= 10;
+        while (num > 0) {
+            len += 1;
+            num /= 10;
+        }
+        return len;
     }
 
     /**
@@ -275,44 +310,78 @@ public:
      * @return
      */
     Message* deserializeMessage(char* buffer) {
-        size_t msgKindSize = buffer[0];
-        char* curr = new char[msgKindSize];
-
-        for(size_t i = 0; i < msgKindSize; i++) {
-            curr[i] = buffer[i];
+        if (buffer[0] == 'D') {
+            return deserializeDirectory(buffer);
+        } else if (buffer[0] == 'R') {
+            return deserializeRegister(buffer);
         }
-        MsgKind msgKind;
-        size_t sender;
-        size_t target;
-        size_t id;
+    }
 
-        if(strcmp(curr, "ACK") == 0) {
-            msgKind = MsgKind ::Ack;
-        } else if (strcmp(curr, "NACK") == 0) {
-            msgKind = MsgKind ::Nack;
-        } else if(strcmp(curr, "PUT") == 0){
-            msgKind = MsgKind ::Put;
-        } else if(strcmp(curr, "REPLY") == 0){
-            msgKind = MsgKind ::Reply;
-        } else if(strcmp(curr, "GET") == 0){
-            msgKind = MsgKind ::Get;
-        } else if(strcmp(curr, "WAITANDGET") == 0){
-            msgKind = MsgKind ::WaitAndGet;
-        } else if(strcmp(curr, "STATUS") == 0){
-            msgKind = MsgKind ::Status;
-        } else if(strcmp(curr, "KILL") == 0){
-            msgKind = MsgKind ::Kill;
-        } else if(strcmp(curr, "REGISTER") == 0){
-            msgKind = MsgKind ::Register;
-        } else if(strcmp(curr, "DIRECTORY") == 0){
-            msgKind = MsgKind ::Directory;
+    Register* deserializeRegister(char* buffer) {
+        size_t curIndex = 1;
+        std::string ser = buffer;
+        size_t sender = nextSizeT(ser, curIndex);
+        size_t target = nextSizeT(ser, curIndex);
+        size_t id = nextSizeT(ser, curIndex);
+        std::string address = nextString(ser, curIndex);
+        char* client = strdup(address.c_str());
+        size_t port = nextSizeT(ser, curIndex);
+        Register* r = new Register(sender, port, client);
+        r->id_ = id;
+        return r;
+    }
+
+    Directory* deserializeDirectory(char* buffer) {
+        size_t curIndex = 1;
+        std::string ser = buffer;
+        size_t sender = nextSizeT(ser, curIndex);
+        size_t target = nextSizeT(ser, curIndex);
+        size_t id = nextSizeT(ser, curIndex);
+        size_t clients = nextSizeT(ser, curIndex);
+
+        size_t* ports = new size_t[clients];
+        for (size_t i = 0; i < clients; i += 1) {
+            size_t port = nextSizeT(ser, curIndex);
+            ports[i] = port;
         }
+        String** addresses = new String*[clients];
+        for (size_t i = 0; i < clients; i += 1) {
+            std::string address = nextString(ser, curIndex);
+            addresses[i] = new String(address.c_str());
+        }
+        Directory* dir = new Directory(clients, ports, addresses);
+        dir->sender_ = sender;
+        dir->target_ = target;
+        dir->id_ = id;
+        return dir;
+    }
 
-        size_t index = msgKindSize + 1;
-        sender = buffer[index];
-        target = buffer[index+1];
-        id = buffer[index+2];
+    size_t nextSizeT(const std::string& str, size_t& curIndex) {
+        size_t subLen = len(str, curIndex);
+        curIndex = str.find("|", curIndex) + 1;
+        size_t next = num(str, curIndex, subLen);
+        curIndex += subLen;
+        return next;
+    }
 
-        return new Message(msgKind, sender, target, id);
+    std::string nextString(const std::string& str, size_t& curIndex) {
+        size_t subLen = len(str, curIndex);
+        curIndex = str.find("|", curIndex) + 1;
+        std::string next = str.substr(curIndex, subLen);
+        curIndex += subLen;
+        return next;
+    }
+
+    size_t len(const std::string& str, size_t ind) {
+        size_t endIndex = str.find("|", ind);
+        std::string sub = str.substr(ind, endIndex);
+        size_t len = std::stoi(sub);
+        return len;
+    }
+
+    size_t num(const std::string& str, size_t beg, size_t end) {
+        std::string sub = str.substr(beg, end);
+        size_t num = std::stoi(sub);
+        return num;
     }
 };

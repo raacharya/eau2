@@ -1,7 +1,6 @@
 #pragma once
 
 #include "dataframe.h"
-#include "store.h"
 #include "network.h"
 
 class Application {

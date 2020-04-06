@@ -3,6 +3,7 @@
 #include "dataframe.h"
 #include "application.h"
 #include <stdio.h>
+#include "network_ip.h"
 
 /**
  * Ensures that the serializer correctly serializes and deserializes a float
@@ -87,25 +88,87 @@ void testFloatArr() {
 /**
  * Ensures that the serializer correctly serializes and deserializes a message
  */
-void testMessage() {
+void testMessageDirectory() {
 
     Serializer* serializer = new Serializer();
-    MsgKind a = MsgKind ::Ack;
     size_t sender = 90;
     size_t target = 91;
     size_t id = 92;
+    size_t clients = 5;
+    size_t* ports = new size_t[clients];
+    for (size_t i = 0; i < clients; i += 1) {
+        ports[i] = i;
+    }
+    String** addresses = new String*[clients];
+    addresses[0] = new String("hello");
+    addresses[1] = new String("there");
+    addresses[2] = new String("world");
+    addresses[3] = new String("what");
+    addresses[4] = new String("good");
 
-    Message* m = new Message(a, sender, target, id);
+    Directory* m = new Directory(clients, ports, addresses);
+    m->sender_ = sender;
+    m->target_ = target;
+    m->id_ = id;
 
     char* serializedMessage = serializer->serialize(m);
 
-    Message* deserializedMessage = serializer->deserializeMessage(serializedMessage);
+    Directory* deserializedMessage = dynamic_cast<Directory*>(serializer->deserializeMessage(serializedMessage));
 
-    std::cout << deserializedMessage->sender_ << "\n";
-    std::cout << deserializedMessage->target_ << "\n";
-    std::cout << deserializedMessage->id_ << "\n";
+    assert(sender == deserializedMessage->sender_);
+    assert(target == deserializedMessage->target_);
+    assert(id == deserializedMessage->id_);
+    assert(clients == deserializedMessage->clients);
+    for (size_t i = 0; i < clients; i += 1) {
+        assert(ports[i] == deserializedMessage->ports[i]);
+    }
+    assert(addresses[0]->equals(deserializedMessage->addresses[0]));
+    assert(addresses[1]->equals(deserializedMessage->addresses[1]));
+    assert(addresses[2]->equals(deserializedMessage->addresses[2]));
+    assert(addresses[3]->equals(deserializedMessage->addresses[3]));
+    assert(addresses[4]->equals(deserializedMessage->addresses[4]));
+}
 
-    std::cout << "works for message" << "\n";
+/**
+ * Ensures that the serializer correctly serializes and deserializes a message
+ */
+void testMessageRegister() {
+
+    Serializer* serializer = new Serializer();
+    size_t sender = 90;
+    size_t id = 92;
+    char* client = "192.0.2.33";
+    size_t port = 8080;
+
+    Register* m = new Register(sender, port, client);
+    m->id_ = id;
+
+    char* serializedMessage = serializer->serialize(m);
+
+    Register* deserializedMessage = dynamic_cast<Register*>(serializer->deserializeMessage(serializedMessage));
+
+    assert(sender == deserializedMessage->sender_);
+    assert(0 == deserializedMessage->target_);
+    assert(id == deserializedMessage->id_);
+    assert(strcmp(client, deserializedMessage->client) == 0);
+    assert(port == deserializedMessage->port);
+}
+
+void testNetwork() {
+    size_t num_nodes = 5;
+    NetworkIP* ips = new NetworkIP[num_nodes];
+    std::thread* pids = new std::thread[num_nodes];
+    String* serverAddr = new String("127.0.0.1");
+    pids[0] = std::thread(&NetworkIP::server_init, ips[0], 0, 9000);
+    for (size_t i = 1; i < num_nodes; i += 1) {
+        pids[i] = std::thread(&NetworkIP::client_init, ips[i], i, 9000 + i, serverAddr->c_str(), 9000);
+    }
+    for (size_t i = 0; i < num_nodes; i += 1) {
+        pids[i].join();
+    }
+    delete serverAddr;
+    delete[] ips;
+    delete[] pids;
 }
 
 /**
@@ -119,10 +182,11 @@ int main(int argc, char** argv) {
 //    testSizeT();
 //    testStringArr();
 //    testFloatArr();
-//    testMessage();
-//
+//    testMessageDirectory();
+//    testMessageRegister();
+    testNetwork();
 //    std::cout << "ALL PASSED";
-    Trivial triv(0);
-    triv.run_();
+//    Trivial triv(0);
+//    triv.run_();
     return 0;
 }

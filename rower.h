@@ -10,7 +10,7 @@ class Rower : public Object {
     public:
 
         /** This method is called once per row. The row object is on loan and
-            should not be retained as it is likely going to be reused in the next
+            should not be retained as it is likely going to be reused in the nextSizeT
             call. The return value is used in filters to indicate that a row
             should be kept. */
         virtual bool accept(Row &r) {

@@ -70,7 +70,7 @@ class String : public Object {
         /** Deep copy of this string */
         String *clone() { return new String(*this); }
 
-        /** This consumes cstr_, the String must be deleted next */
+        /** This consumes cstr_, the String must be deleted nextSizeT */
         char *steal() {
             char *res = cstr_;
             cstr_ = nullptr;

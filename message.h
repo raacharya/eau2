@@ -26,6 +26,8 @@ class Message : public Object {
 
         size_t id_;     // an id t unique within the node
 
+        Message() {}
+
         Message(MsgKind kind, size_t sender, size_t target, size_t id) {
             kind_ = kind;
             sender_ = sender;
@@ -47,39 +49,32 @@ class Ack : public Message {
 };
 
 
-class Status : public Message {
-
-    public:
-
-        String* msg_; // owned
-
-
-
-};
-
-
 class Register : public Message {
-
     public:
-
-        sockaddr_in client;
+        char* client;
         size_t port;
 
-
-
-
+        Register(unsigned idx_, size_t port_, char* client_) {
+            client = client_;
+            port = port_;
+            sender_ = idx_;
+            target_ = 0;
+            kind_ = MsgKind::Register;
+        }
 };
 
 
 
 class Directory : public Message {
-
     public:
-
-        size_t client;
-
+        size_t clients;
         size_t * ports;  // owned
-
         String ** addresses;  // owned; strings owned
 
+        Directory(size_t clients_, size_t* ports_, String** addresses_) {
+            clients = clients_;
+            ports = ports_;
+            addresses = addresses_;
+            kind_ = MsgKind::Directory;
+        }
 };

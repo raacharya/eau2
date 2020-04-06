@@ -840,8 +840,8 @@ class EffColArr : public Object {
 
 
 /*************************************************************************
- * EffColArr::
- * Holds Columns
+ * DistEffColArr:
+ * Holds Columns in a distributed network
  */
 class DistEffColArr : public Object {
     public:

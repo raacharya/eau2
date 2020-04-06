@@ -213,10 +213,10 @@ class LineReader : public Object {
     }
 
     /**
-     * The main method implemented by this type. Reads the next full line out of the file. If
+     * The main method implemented by this type. Reads the nextSizeT full line out of the file. If
      * starting from a nonzero offset or ending before the end of the file, the first and last
      * lines respectively are skipped.
-     * @return The next line, or nullptr if we are out of lines
+     * @return The nextSizeT line, or nullptr if we are out of lines
      */
     virtual char* readLine() {
         bool skip_line = _read_size == 0 && _file_start != 0;
@@ -255,7 +255,7 @@ class LineReader : public Object {
                 }
             }
 
-            // Search for the next newline in the current buffer, and return the completed line
+            // Search for the nextSizeT newline in the current buffer, and return the completed line
             // if we find one
             size_t start = _pos;
             for (size_t i = start; i < _buf_length; i++) {
@@ -369,7 +369,7 @@ class SorParser : public Object {
     }
 
     /**
-     * Appends the next entry contained in the given StrSlice to the column at the given index,
+     * Appends the nextSizeT entry contained in the given StrSlice to the column at the given index,
      * using the type of the column.
      * @param slice The slice containing the data for this field
      * @param field_num The column index

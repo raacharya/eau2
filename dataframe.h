@@ -433,14 +433,29 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     return newDf;
 }
 
+/**
+ * Get the DistDataframe associated with the key
+ * @param key - the key for the DistDataframe
+ * @return - DistDatafram associated with the key
+ */
 DistDataFrame* KDStore::get(Key& key) {
     return new DistDataFrame(key.key, kvStore);
 }
 
+/**
+ * Construct a new DistDataframe from a Dataframe and store it in the nodes
+ * @param key - the key associated with the new Dataframe
+ * @param df - the Dataframe to base the new DistDataframe off of
+ */
 void KDStore::put(Key& key, DataFrame* df) {
     delete new DistDataFrame(*df, key.key, kvStore);
 }
 
+/**
+ * Get the DistDataframe associated with the key when it exists
+ * @param key - the key for the DistDataframe
+ * @return - DistDatafram associated with the key
+ */
 DistDataFrame* KDStore::waitAndGet(Key& key) {
     while (true) {
         DistDataFrame* df = get(key);
