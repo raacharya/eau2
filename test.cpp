@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
 //    testMessageRegister();
     testNetwork();
 //    std::cout << "ALL PASSED";
-//    Trivial triv(0);
-//    triv.run_();
+    Trivial triv(0);
+    triv.run_();
     return 0;
 }

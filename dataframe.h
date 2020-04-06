@@ -278,7 +278,7 @@ class DistDataFrame : public Object {
             schema = new DistSchema(id, kvStore);
             String* cols_id = id->clone();
             cols_id->concat("-cols");
-            columns = new DistEffColArr(cols_id, kvStore);
+            columns = new DistEffColArr(schema->types, cols_id, kvStore);
         }
 
         DistDataFrame(DataFrame &from, String* id_var, Distributable* kvStore_var) {
@@ -464,4 +464,3 @@ DistDataFrame* KDStore::waitAndGet(Key& key) {
         }
     }
 }
-

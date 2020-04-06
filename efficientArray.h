@@ -110,6 +110,126 @@ class EffIntArr : public Object {
 };
 
 /*************************************************************************
+ * DistEffIntArr:
+ * Holds Ints in a distributed network
+ */
+class DistEffIntArr : public Object {
+    public:
+        size_t chunkSize;
+        size_t capacity;
+        size_t currentChunkIdx;
+        size_t numberOfElements;
+        String* id;
+        Distributable* kvStore;
+
+        /**
+         * @brief Construct a new Eff Col Arr object
+         *
+         */
+        DistEffIntArr(String* id_var, Distributable* kvStore_var) {
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = getSizeTFromKey("chunkSize");
+            capacity = getSizeTFromKey("capacity");
+            currentChunkIdx = getSizeTFromKey("currentChunk");
+            numberOfElements = getSizeTFromKey("numElements");
+        }
+
+        size_t getSizeTFromKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            Key* sizeTKey = new Key(idClone, 0);
+            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
+            delete sizeTKey;
+        }
+
+        /**
+         * @brief Construct a new Eff Col Arr object from another eff col arr objects
+         *
+         * @param from
+         */
+        DistEffIntArr(EffIntArr& from, String* id_var, Distributable* kvStore_var) {
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = from.chunkSize;
+            capacity = from.capacity;
+            currentChunkIdx = from.currentChunkIdx;
+            numberOfElements = from.numberOfElements;
+
+
+            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
+            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
+            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            for (size_t i = 0; i < capacity; i += 1) {
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
+            }
+        }
+
+        size_t length(size_t s) {
+            size_t len = 1;
+            s = s / 10;
+            while (s) {
+                s = s / 10;
+                len += 1;
+            }
+            return len;
+        }
+
+        Key* createKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            return new Key(idClone, 0);
+        }
+
+        Value* createValue(size_t s) {
+            Value* val = new Value;
+            val->st = s;
+            return val;
+        }
+
+        Value* createValue(FixedIntArray* fixedIntArray) {
+            Value* val = new Value;
+            val->obj = fixedIntArray;
+            return val;
+        }
+
+        /**
+         * @brief Get the column at the given index
+         *
+         * @param idx
+         * @return Column*
+         */
+        int get(size_t idx) {
+            size_t chunkIdx = idx / chunkSize;
+            char* buf = new char[length(idx) + 1];
+            sprintf(buf, "%zu", idx);
+            Value* val = kvStore->getFromNode(createKey(buf));
+            Object* obj = val->obj;
+            FixedIntArray* curChunk = dynamic_cast<FixedIntArray*>(obj);
+            return curChunk->get(idx % chunkSize);
+        }
+
+        /**
+         * @brief get the size of this column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return numberOfElements;
+        }
+
+        /**
+         * @brief Destroy the Eff Col Arr object
+         *
+         */
+        ~DistEffIntArr() {
+        }
+};
+
+/*************************************************************************
  * EffFloatArr::
  * Holds float values.
  */
@@ -226,6 +346,126 @@ class EffFloatArr : public Object {
 };
 
 /*************************************************************************
+ * DistEffFloatArr:
+ * Holds Floats in a distributed network
+ */
+class DistEffFloatArr : public Object {
+    public:
+        size_t chunkSize;
+        size_t capacity;
+        size_t currentChunkIdx;
+        size_t numberOfElements;
+        String* id;
+        Distributable* kvStore;
+
+        /**
+         * @brief Construct a new Eff Col Arr object
+         *
+         */
+        DistEffFloatArr(String* id_var, Distributable* kvStore_var) {
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = getSizeTFromKey("chunkSize");
+            capacity = getSizeTFromKey("capacity");
+            currentChunkIdx = getSizeTFromKey("currentChunk");
+            numberOfElements = getSizeTFromKey("numElements");
+        }
+
+        size_t getSizeTFromKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            Key* sizeTKey = new Key(idClone, 0);
+            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
+            delete sizeTKey;
+        }
+
+        /**
+         * @brief Construct a new Eff Col Arr object from another eff col arr objects
+         *
+         * @param from
+         */
+        DistEffFloatArr(EffFloatArr& from, String* id_var, Distributable* kvStore_var) {
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = from.chunkSize;
+            capacity = from.capacity;
+            currentChunkIdx = from.currentChunkIdx;
+            numberOfElements = from.numberOfElements;
+
+
+            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
+            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
+            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            for (size_t i = 0; i < capacity; i += 1) {
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
+            }
+        }
+
+        size_t length(size_t s) {
+            size_t len = 1;
+            s = s / 10;
+            while (s) {
+                s = s / 10;
+                len += 1;
+            }
+            return len;
+        }
+
+        Key* createKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            return new Key(idClone, 0);
+        }
+
+        Value* createValue(size_t s) {
+            Value* val = new Value;
+            val->st = s;
+            return val;
+        }
+
+        Value* createValue(FixedFloatArray* fixedArray) {
+            Value* val = new Value;
+            val->obj = fixedArray;
+            return val;
+        }
+
+        /**
+         * @brief Get the column at the given index
+         *
+         * @param idx
+         * @return Column*
+         */
+        float get(size_t idx) {
+            size_t chunkIdx = idx / chunkSize;
+            char* buf = new char[length(idx) + 1];
+            sprintf(buf, "%zu", idx);
+            Value* val = kvStore->getFromNode(createKey(buf));
+            Object* obj = val->obj;
+            FixedFloatArray* curChunk = dynamic_cast<FixedFloatArray*>(obj);
+            return curChunk->get(idx % chunkSize);
+        }
+
+        /**
+         * @brief get the size of this column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return numberOfElements;
+        }
+
+        /**
+         * @brief Destroy the Eff Col Arr object
+         *
+         */
+        ~DistEffFloatArr() {
+        }
+};
+
+/*************************************************************************
  * EffBoolArr::
  * Holds bool values.
  */
@@ -326,6 +566,126 @@ class EffBoolArr : public Object {
             delete chunks[i];
           }
           delete[] chunks;
+        }
+};
+
+/*************************************************************************
+ * DistEffBoolArr:
+ * Holds Bools in a distributed network
+ */
+class DistEffBoolArr : public Object {
+    public:
+        size_t chunkSize;
+        size_t capacity;
+        size_t currentChunkIdx;
+        size_t numberOfElements;
+        String* id;
+        Distributable* kvStore;
+
+        /**
+         * @brief Construct a new Eff Col Arr object
+         *
+         */
+        DistEffBoolArr(String* id_var, Distributable* kvStore_var) {
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = getSizeTFromKey("chunkSize");
+            capacity = getSizeTFromKey("capacity");
+            currentChunkIdx = getSizeTFromKey("currentChunk");
+            numberOfElements = getSizeTFromKey("numElements");
+        }
+
+        size_t getSizeTFromKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            Key* sizeTKey = new Key(idClone, 0);
+            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
+            delete sizeTKey;
+        }
+
+        /**
+         * @brief Construct a new Eff Col Arr object from another eff col arr objects
+         *
+         * @param from
+         */
+        DistEffBoolArr(EffBoolArr& from, String* id_var, Distributable* kvStore_var) {
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = from.chunkSize;
+            capacity = from.capacity;
+            currentChunkIdx = from.currentChunkIdx;
+            numberOfElements = from.numberOfElements;
+
+
+            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
+            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
+            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            for (size_t i = 0; i < capacity; i += 1) {
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
+            }
+        }
+
+        size_t length(size_t s) {
+            size_t len = 1;
+            s = s / 10;
+            while (s) {
+                s = s / 10;
+                len += 1;
+            }
+            return len;
+        }
+
+        Key* createKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            return new Key(idClone, 0);
+        }
+
+        Value* createValue(size_t s) {
+            Value* val = new Value;
+            val->st = s;
+            return val;
+        }
+
+        Value* createValue(FixedBoolArray* fixedArray) {
+            Value* val = new Value;
+            val->obj = fixedArray;
+            return val;
+        }
+
+        /**
+         * @brief Get the column at the given index
+         *
+         * @param idx
+         * @return Column*
+         */
+        bool get(size_t idx) {
+            size_t chunkIdx = idx / chunkSize;
+            char* buf = new char[length(idx) + 1];
+            sprintf(buf, "%zu", idx);
+            Value* val = kvStore->getFromNode(createKey(buf));
+            Object* obj = val->obj;
+            FixedBoolArray* curChunk = dynamic_cast<FixedBoolArray*>(obj);
+            return curChunk->get(idx % chunkSize);
+        }
+
+        /**
+         * @brief get the size of this column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return numberOfElements;
+        }
+
+        /**
+         * @brief Destroy the Eff Col Arr object
+         *
+         */
+        ~DistEffBoolArr() {
         }
 };
 
@@ -434,6 +794,126 @@ class EffCharArr : public Object {
             delete chunks[i];
           }
           delete[] chunks;
+        }
+};
+
+/*************************************************************************
+ * DistEffCharArr:
+ * Holds Chars in a distributed network
+ */
+class DistEffCharArr : public Object {
+    public:
+        size_t chunkSize;
+        size_t capacity;
+        size_t currentChunkIdx;
+        size_t numberOfElements;
+        String* id;
+        Distributable* kvStore;
+
+        /**
+         * @brief Construct a new Eff Col Arr object
+         *
+         */
+        DistEffCharArr(String* id_var, Distributable* kvStore_var) {
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = getSizeTFromKey("chunkSize");
+            capacity = getSizeTFromKey("capacity");
+            currentChunkIdx = getSizeTFromKey("currentChunk");
+            numberOfElements = getSizeTFromKey("numElements");
+        }
+
+        size_t getSizeTFromKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            Key* sizeTKey = new Key(idClone, 0);
+            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
+            delete sizeTKey;
+        }
+
+        /**
+         * @brief Construct a new Eff Col Arr object from another eff col arr objects
+         *
+         * @param from
+         */
+        DistEffCharArr(EffCharArr& from, String* id_var, Distributable* kvStore_var) {
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = from.chunkSize;
+            capacity = from.capacity;
+            currentChunkIdx = from.currentChunkIdx;
+            numberOfElements = from.numberOfElements;
+
+
+            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
+            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
+            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            for (size_t i = 0; i < capacity; i += 1) {
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
+            }
+        }
+
+        size_t length(size_t s) {
+            size_t len = 1;
+            s = s / 10;
+            while (s) {
+                s = s / 10;
+                len += 1;
+            }
+            return len;
+        }
+
+        Key* createKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            return new Key(idClone, 0);
+        }
+
+        Value* createValue(size_t s) {
+            Value* val = new Value;
+            val->st = s;
+            return val;
+        }
+
+        Value* createValue(FixedCharArray* fixedArray) {
+            Value* val = new Value;
+            val->obj = fixedArray;
+            return val;
+        }
+
+        /**
+         * @brief Get the column at the given index
+         *
+         * @param idx
+         * @return Column*
+         */
+        char get(size_t idx) {
+            size_t chunkIdx = idx / chunkSize;
+            char* buf = new char[length(idx) + 1];
+            sprintf(buf, "%zu", idx);
+            Value* val = kvStore->getFromNode(createKey(buf));
+            Object* obj = val->obj;
+            FixedCharArray* curChunk = dynamic_cast<FixedCharArray*>(obj);
+            return curChunk->get(idx % chunkSize);
+        }
+
+        /**
+         * @brief get the size of this column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return numberOfElements;
+        }
+
+        /**
+         * @brief Destroy the Eff Col Arr object
+         *
+         */
+        ~DistEffCharArr() {
         }
 };
 
@@ -553,6 +1033,113 @@ class EffStrArr : public Object {
           }
           delete[] chunks;
         }
+};
+
+/*************************************************************************
+ * DistEffStrArr::
+ * Holds String values in distributed nodes. Is unmodifiable.
+ */
+class DistEffStrArr : public Object {
+    public:
+        size_t chunkSize;
+        size_t capacity;
+        size_t currentChunkIdx;
+        size_t numberOfElements;
+        String* id;
+        Distributable* kvStore;
+
+        DistEffStrArr(String* id_var, Distributable* kvStore_var) {
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = getSizeTFromKey("chunkSize");
+            capacity = getSizeTFromKey("capacity");
+            currentChunkIdx = getSizeTFromKey("currentChunk");
+            numberOfElements = getSizeTFromKey("numElements");
+        }
+
+        size_t getSizeTFromKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            Key* sizeTKey = new Key(idClone, 0);
+            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
+            delete sizeTKey;
+        }
+
+        bool equals(Object* other) {
+            DistEffStrArr* o = dynamic_cast<DistEffStrArr *> (other);
+            if(o) {
+                for(size_t i = 0; i < numberOfElements; i++) {
+                    if(!get(i)->equals(o->get(i))) {
+                        return false;
+                    }
+                }
+            }
+            return numberOfElements == o->numberOfElements;
+        }
+
+        DistEffStrArr(EffStrArr& from, String* id_var, Distributable* kvStore_var) {
+            // this will basically send all the chunks to the various nodes
+            // as well as the metadata, essentially storing the data of this
+            // in the nodes
+            id = id_var;
+            kvStore = kvStore_var;
+            chunkSize = from.chunkSize;
+            capacity = from.capacity;
+            currentChunkIdx = from.currentChunkIdx;
+            numberOfElements = from.numberOfElements;
+
+            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
+            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
+            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            for (size_t i = 0; i < capacity; i += 1) {
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]));
+            }
+        }
+
+        size_t length(size_t s) {
+            size_t len = 1;
+            s = s / 10;
+            while (s) {
+                s = s / 10;
+                len += 1;
+            }
+            return len;
+        }
+
+        Key* createKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            return new Key(idClone, 0);
+        }
+
+        Value* createValue(size_t s) {
+            Value* val = new Value;
+            val->st = s;
+            return val;
+        }
+
+        Value* createValue(FixedStrArray* fixedStrArray) {
+            Value* val = new Value;
+            val->obj = fixedStrArray;
+            return val;
+        }
+
+        String* get(size_t idx) {
+            size_t chunkIdx = idx / chunkSize;
+            char* buf = new char[length(idx) + 1];
+            sprintf(buf, "%zu", idx);
+            FixedStrArray* curChunk = dynamic_cast<FixedStrArray*>(kvStore->getFromNode(createKey(buf))->obj);
+            return curChunk->get(idx % chunkSize);
+        }
+
+        size_t size() {
+            return numberOfElements;
+        }
+
+        ~DistEffStrArr() {}
 };
         
 /*************************************************************************

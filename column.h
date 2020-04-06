@@ -9,6 +9,10 @@ class IntColumn;
 class BoolColumn;
 class FloatColumn;
 class StringColumn;
+class DistIntColumn;
+class DistBoolColumn;
+class DistFloatColumn;
+class DistStringColumn;
 
 
 /**************************************************************************
@@ -63,9 +67,49 @@ class Column : public Object {
       return type;
     }
 
+    virtual Column* clone(){
+        assert(false);
+    };
+
     virtual ~Column() {
 
     }
+
+};
+
+class DistColumn : public Object {
+    public:
+
+        char type;
+
+        /** Type converters: Return same column under its actual type, or
+         *  nullptr if of the wrong type.  */
+        virtual DistIntColumn* as_int() {
+
+        }
+        virtual DistBoolColumn*  as_bool() {
+
+        }
+        virtual DistFloatColumn* as_float() {
+
+        }
+        virtual DistStringColumn* as_string() {
+
+        }
+
+        /** Returns the number of elements in the column. */
+        virtual size_t size() {
+
+        }
+
+        /** Return the type of this column as a char: 'S', 'B', 'I' and 'F'.*/
+        char get_type() {
+            return type;
+        }
+
+        virtual ~DistColumn() {
+
+        }
 
 };
 
@@ -111,6 +155,10 @@ class IntColumn : public Column {
             array = new EffIntArr(*from.array);
             type = 'I';
         }
+
+        IntColumn* clone(){
+            return new IntColumn(*this);
+        };
 
         /**
          * @brief get the int at the given index
@@ -197,6 +245,95 @@ class IntColumn : public Column {
 };
 
 /*************************************************************************
+ * DistIntColumn::
+ * Holds int values in a distributed network.
+ */
+class DistIntColumn : public DistColumn {
+    public:
+        DistEffIntArr* array;
+
+        /**
+         * @brief Construct a new Int Column object
+         *
+         */
+        DistIntColumn(String* id, Distributable* kv_store) {
+            array = new DistEffIntArr(id, kv_store);
+            type = 'I';
+        }
+
+        /**
+         * @brief Construct a new Int Column object
+         *
+         * @param from
+         */
+        DistIntColumn(IntColumn& from, String* id, Distributable* kv_store) {
+            array = new DistEffIntArr(*from.array, id, kv_store);
+            type = 'I';
+        }
+
+        /**
+         * @brief get the int at the given index
+         *
+         * @param idx
+         * @return int
+         */
+        int get(size_t idx) {
+            return array->get(idx);
+        }
+
+        /**
+         * @brief return this int column as an int column
+         *
+         * @return IntColumn*
+         */
+        DistIntColumn* as_int() {
+            return this;
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return FloatColumn*
+         */
+        DistFloatColumn* as_float() {
+            assert(false);
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return BoolColumn*
+         */
+        DistBoolColumn* as_bool() {
+            assert(false);
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return StringColumn*
+         */
+        DistStringColumn* as_string() {
+            assert(false);
+        }
+
+        /**
+         * @brief get the size of this int column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return array->size();
+        }
+
+        /**
+         * @brief Destroy the Int Column object
+         *
+         */
+        ~DistIntColumn() {}
+};
+
+/*************************************************************************
  * BoolColumn::
  * Holds bool values.
  */
@@ -238,6 +375,10 @@ class BoolColumn : public Column {
             array = new EffBoolArr(*from.array);
             type = 'B';
         }
+
+        BoolColumn* clone(){
+            return new BoolColumn(*this);
+        };
 
         /**
          * @brief Destroy the Bool Column object
@@ -324,6 +465,94 @@ class BoolColumn : public Column {
         }
 };
 
+/*************************************************************************
+ * DistBoolColumn::
+ * Holds bool values in a distributed network.
+ */
+class DistBoolColumn : public DistColumn {
+    public:
+        DistEffBoolArr* array;
+
+        /**
+         * @brief Construct a new Int Column object
+         *
+         */
+        DistBoolColumn(String* id, Distributable* kv_store) {
+            array = new DistEffBoolArr(id, kv_store);
+            type = 'I';
+        }
+
+        /**
+         * @brief Construct a new Int Column object
+         *
+         * @param from
+         */
+        DistBoolColumn(BoolColumn& from, String* id, Distributable* kv_store) {
+            array = new DistEffBoolArr(*from.array, id, kv_store);
+            type = 'I';
+        }
+
+        /**
+         * @brief get the int at the given index
+         *
+         * @param idx
+         * @return int
+         */
+        bool get(size_t idx) {
+            return array->get(idx);
+        }
+
+        /**
+         * @brief return this int column as an int column
+         *
+         * @return IntColumn*
+         */
+        DistIntColumn* as_int() {
+            assert(false);
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return FloatColumn*
+         */
+        DistFloatColumn* as_float() {
+            assert(false);
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return BoolColumn*
+         */
+        DistBoolColumn* as_bool() {
+            return this;
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return StringColumn*
+         */
+        DistStringColumn* as_string() {
+            assert(false);
+        }
+
+        /**
+         * @brief get the size of this int column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return array->size();
+        }
+
+        /**
+         * @brief Destroy the Int Column object
+         *
+         */
+        ~DistBoolColumn() {}
+};
 
 /*************************************************************************
  * FloatColumn::
@@ -375,6 +604,10 @@ class FloatColumn : public Column {
         ~FloatColumn() {
             delete array;
         }
+
+        FloatColumn* clone(){
+            return new FloatColumn(*this);
+        };
 
         /**
          * @brief get the float at the given index
@@ -447,6 +680,95 @@ class FloatColumn : public Column {
 };
 
 /*************************************************************************
+ * DistFloatColumn::
+ * Holds float values in a distributed network.
+ */
+class DistFloatColumn : public DistColumn {
+    public:
+        DistEffFloatArr* array;
+
+        /**
+         * @brief Construct a new Int Column object
+         *
+         */
+        DistFloatColumn(String* id, Distributable* kv_store) {
+            array = new DistEffFloatArr(id, kv_store);
+            type = 'I';
+        }
+
+        /**
+         * @brief Construct a new Int Column object
+         *
+         * @param from
+         */
+        DistFloatColumn(FloatColumn& from, String* id, Distributable* kv_store) {
+            array = new DistEffFloatArr(*from.array, id, kv_store);
+            type = 'I';
+        }
+
+        /**
+         * @brief get the int at the given index
+         *
+         * @param idx
+         * @return int
+         */
+        float get(size_t idx) {
+            return array->get(idx);
+        }
+
+        /**
+         * @brief return this int column as an int column
+         *
+         * @return IntColumn*
+         */
+        DistIntColumn* as_int() {
+            assert(false);
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return FloatColumn*
+         */
+        DistFloatColumn* as_float() {
+            return this;
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return BoolColumn*
+         */
+        DistBoolColumn* as_bool() {
+            assert(false);
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return StringColumn*
+         */
+        DistStringColumn* as_string() {
+            assert(false);
+        }
+
+        /**
+         * @brief get the size of this int column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return array->size();
+        }
+
+        /**
+         * @brief Destroy the Int Column object
+         *
+         */
+        ~DistFloatColumn() {}
+};
+
+/*************************************************************************
  * StringColumn::
  * Holds String values.
  */
@@ -498,6 +820,10 @@ class StringColumn : public Column {
         ~StringColumn() {
             delete array;
         }
+
+        StringColumn* clone(){
+            return new StringColumn(*this);
+        };
 
         /**
          * @brief get the string at the given index
@@ -569,8 +895,97 @@ class StringColumn : public Column {
         }
 };
 
+/*************************************************************************
+ * DistStringColumn::
+ * Holds String values in a distributed network.
+ */
+class DistStringColumn : public DistColumn {
+    public:
+        DistEffStrArr* array;
+
+        /**
+         * @brief Construct a new Int Column object
+         *
+         */
+        DistStringColumn(String* id, Distributable* kv_store) {
+            array = new DistEffStrArr(id, kv_store);
+            type = 'I';
+        }
+
+        /**
+         * @brief Construct a new Int Column object
+         *
+         * @param from
+         */
+        DistStringColumn(StringColumn& from, String* id, Distributable* kv_store) {
+            array = new DistEffStrArr(*from.array, id, kv_store);
+            type = 'I';
+        }
+
+        /**
+         * @brief get the int at the given index
+         *
+         * @param idx
+         * @return int
+         */
+        String* get(size_t idx) {
+            return array->get(idx);
+        }
+
+        /**
+         * @brief return this int column as an int column
+         *
+         * @return IntColumn*
+         */
+        DistIntColumn* as_int() {
+            assert(false);
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return FloatColumn*
+         */
+        DistFloatColumn* as_float() {
+            assert(false);
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return BoolColumn*
+         */
+        DistBoolColumn* as_bool() {
+            assert(false);
+        }
+
+        /**
+         * @brief throw error since this is an int column
+         *
+         * @return StringColumn*
+         */
+        DistStringColumn* as_string() {
+            return this;
+        }
+
+        /**
+         * @brief get the size of this int column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return array->size();
+        }
+
+        /**
+         * @brief Destroy the Int Column object
+         *
+         */
+        ~DistStringColumn() {}
+};
+
 /**
- * Represents an array of Columns.
+ * Represents an array of Columns on distributed nodes.
  */
 class FixedColArray : public Object {
 	public:
@@ -703,6 +1118,155 @@ class FixedColArray : public Object {
 		    }
 			delete array;
 		}
+};
+
+/**
+ * Represents an array of Columns.
+ */
+class DistFixedColArray : public Object {
+    public:
+        String* id;
+        Distributable* kvStore;
+        size_t used;
+        size_t capacity;
+        DistColumn** array;
+
+        /**
+         * Default constructor of this array.
+         */
+        DistFixedColArray(FixedColArray &from, String* id_var, Distributable* kvStore_var) : Object() {
+            id = id_var;
+            kvStore = kvStore_var;
+            used = from.array->used;
+            capacity = from.array->capacity;
+
+            kvStore->sendToNode(createKey("used"), createValue(used));
+            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
+            array = new DistColumn*[capacity];
+            for (size_t i = 0; i < used; i += 1) {
+                Column* col = from.get(i);
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                String* col_id = id_var->clone();
+                col_id->concat(buf);
+                if (col->get_type() == 'I') {
+                    DistIntColumn* copy = new DistIntColumn(*col->as_int(), col_id, kvStore);
+                    array[i] = copy;
+                } else if (col->get_type() == 'F') {
+                    DistFloatColumn* copy = new DistFloatColumn(*col->as_float(), col_id, kvStore);
+                    array[i] = copy;
+                } else if (col->get_type() == 'B') {
+                    DistBoolColumn* copy = new DistBoolColumn(*col->as_bool(), col_id, kvStore);
+                    array[i] = copy;
+                } else {
+                    DistStringColumn* copy = new DistStringColumn(*col->as_string(), col_id, kvStore);
+                    array[i] = copy;
+                }
+            }
+        }
+
+
+        /**
+         * Default constructor of this array.
+         */
+        DistFixedColArray(DistEffCharArr* types, String* id_var, Distributable* kvStore_var) : Object() {
+            id = id_var;
+            kvStore = kvStore_var;
+
+            used = getSizeTFromKey("used");
+            capacity = getSizeTFromKey("capacity");
+            for (size_t i = 0; i < used; i += 1) {
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                String* col_id = id_var->clone();
+                col_id->concat(buf);
+                if (types->get(i) == 'I') {
+                    DistIntColumn* copy = new DistIntColumn(col_id, kvStore);
+                    array[i] = copy;
+                } else if (types->get(i) == 'F') {
+                    DistFloatColumn* copy = new DistFloatColumn(col_id, kvStore);
+                    array[i] = copy;
+                } else if (types->get(i) == 'B') {
+                    DistBoolColumn* copy = new DistBoolColumn(col_id, kvStore);
+                    array[i] = copy;
+                } else {
+                    DistStringColumn* copy = new DistStringColumn(col_id, kvStore);
+                    array[i] = copy;
+                }
+            }
+        }
+
+        size_t getSizeTFromKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            Key* sizeTKey = new Key(idClone, 0);
+            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
+            delete sizeTKey;
+        }
+
+        size_t length(size_t s) {
+            size_t len = 1;
+            s = s / 10;
+            while (s) {
+                s = s / 10;
+                len += 1;
+            }
+            return len;
+        }
+
+        Key* createKey(char* suffix) {
+            String* idClone = id->clone();
+            idClone->concat(suffix);
+            return new Key(idClone, 0);
+        }
+
+        Value* createValue(size_t s) {
+            Value* val = new Value;
+            val->st = s;
+            return val;
+        }
+
+        Value* createValue(DistColumn* distColumn) {
+            Value* val = new Value;
+            val->obj = distColumn;
+            return val;
+        }
+
+
+        /**
+         * Returns an element at the given index.
+         *
+         * @param index the index of the element
+         * @return the element of the array at the given index
+         */
+        virtual DistColumn* get(size_t index) {
+            DistColumn* element = dynamic_cast <DistColumn*> (array[index]);
+            return element;
+        }
+
+        /**
+         * @brief return the size of this array
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return capacity;
+        }
+
+        /**
+         * @brief get the number of elements in this arrays
+         *
+         * @return size_t
+         */
+        size_t numElements() {
+            return used;
+        }
+
+
+        /**
+         * Destructor of this class.
+         */
+        ~DistFixedColArray() {}
 };
 
 /*************************************************************************
@@ -849,21 +1413,30 @@ class DistEffColArr : public Object {
         size_t capacity;
         size_t currentChunkIdx;
         size_t numberOfElements;
-        FixedColArray** chunks;
         String* id;
         Distributable* kvStore;
+        DistFixedColArray** array;
 
         /**
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffColArr(String* id_var, Distributable* kvStore_var) {
+        DistEffColArr(DistEffCharArr* types, String* id_var, Distributable* kvStore_var) {
             id = id_var;
             kvStore = kvStore_var;
             chunkSize = getSizeTFromKey("chunkSize");
             capacity = getSizeTFromKey("capacity");
             currentChunkIdx = getSizeTFromKey("currentChunk");
             numberOfElements = getSizeTFromKey("numElements");
+            array = new DistFixedColArray*[capacity];
+            for (size_t i = 0; i < capacity; i += 1) {
+                char* buf = new char[length(i) + 1];
+                sprintf(buf, "%zu", i);
+                String* col_id = id_var->clone();
+                col_id->concat("-");
+                col_id->concat(buf);
+                array[i] = new DistFixedColArray(types, col_id, kvStore);
+            }
         }
 
         size_t getSizeTFromKey(char* suffix) {
@@ -895,7 +1468,10 @@ class DistEffColArr : public Object {
             for (size_t i = 0; i < capacity; i += 1) {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
-                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
+                String* col_id = id_var->clone();
+                col_id->concat("-");
+                col_id->concat(buf);
+                array[i] = new DistFixedColArray(*from.chunks[i], col_id, kvStore);
             }
         }
 
@@ -933,13 +1509,9 @@ class DistEffColArr : public Object {
          * @param idx
          * @return Column*
          */
-        Column* get(size_t idx) {
+        DistColumn* get(size_t idx) {
             size_t chunkIdx = idx / chunkSize;
-            char* buf = new char[length(idx) + 1];
-            sprintf(buf, "%zu", idx);
-            Value* val = kvStore->getFromNode(createKey(buf));
-            Object* obj = val->obj;
-            FixedColArray* curChunk = dynamic_cast<FixedColArray*>(obj);
+            DistFixedColArray* curChunk = array[chunkIdx];
             return curChunk->get(idx % chunkSize);
         }
 

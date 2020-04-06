@@ -1,6 +1,7 @@
 #pragma once
 #include "object.h"
 #include "string.h"
+#include "network.h"
 #include <cstring>
 #include <assert.h>
 #include <stdlib.h>
@@ -122,6 +123,24 @@ class FixedArray : public Object {
 		}
 };
 
+class DistFixedArray : public Object  {
+    public:
+        String* id;
+        size_t used;
+        size_t capacity;
+        Distributable* kv_store;
+
+        DistFixedArray(FixedArray& from, String* id_var, Distributable* kvStore_var) : Object() {
+            id = id_var;
+            kv_store = kvStore_var;
+        }
+
+        DistFixedArray(String* id_var, Distributable* kvStore_var) : Object() {
+            id = id_var;
+            kv_store = kvStore_var;
+        }
+};
+
 
 /**
  * Represents an array of ints.
@@ -161,6 +180,10 @@ class FixedIntArray : public Object {
 			for (int i = 0; i < used; i += 1) {
 				array[i] = from.get(i);
 			}
+		}
+
+		FixedIntArray* clone() {
+		    return new FixedIntArray(*this);
 		}
 
 
@@ -286,6 +309,10 @@ class FixedCharArray : public Object {
 			array = new char[size];
 		}
 
+        FixedCharArray* clone() {
+            return new FixedCharArray(*this);
+        }
+
 
 		/**
 		 * Returns an element at the given index.
@@ -402,6 +429,10 @@ class FixedBoolArray : public Object {
 				array[i] = from.get(i);
 			}
 		}
+
+        FixedBoolArray* clone() {
+            return new FixedBoolArray(*this);
+        }
 
 
 		/**
@@ -520,6 +551,10 @@ class FixedFloatArray : public Object {
 			}
 		}
 
+        FixedFloatArray* clone() {
+            return new FixedFloatArray(*this);
+        }
+
 
 		/**
 		 * Returns an element at the given index.
@@ -624,9 +659,13 @@ class FixedStrArray : public Object {
 		FixedStrArray(FixedStrArray& from) : FixedStrArray(from.size()) {
 			for (int i = 0; i < from.size(); i += 1) {
 				String* str = from.get(i);
-				set(i, str);
+				set(i, new String(str->c_str()));
 			}
 		}
+
+        FixedStrArray* clone() {
+            return new FixedStrArray(*this);
+        }
 
 
 		/**
