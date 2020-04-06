@@ -127,6 +127,38 @@ void testMessageDirectory() {
     assert(addresses[2]->equals(deserializedMessage->addresses[2]));
     assert(addresses[3]->equals(deserializedMessage->addresses[3]));
     assert(addresses[4]->equals(deserializedMessage->addresses[4]));
+
+    std::cout << "works for directory" << "\n";
+}
+
+/**
+ * Ensures that the serializer correctly serializes and deserializes a message
+ */
+void testMessageGet() {
+
+    Serializer* serializer = new Serializer();
+    size_t sender = 90;
+    size_t target = 91;
+    size_t id = 1;
+    char* type = "B";
+    char* key = "df1-chunk1";
+
+    Get* g = new Get(type, key);
+    g->sender_ = sender;
+    g->target_ = target;
+    g->id_ = id;
+
+    char* serializedMessage = serializer->serializeGet(g);
+
+    Get* get = dynamic_cast<Get *>(serializer->deserializeGet(serializedMessage));
+
+    assert(sender == get->sender_);
+    assert(target == get->target_);
+    assert(id == get->id_);
+    assert(strcmp(type, get->type) == 0);
+    assert(strcmp(key, get->key) == 0);
+
+    std::cout << "works for get" << "\n";
 }
 
 /**
@@ -152,6 +184,8 @@ void testMessageRegister() {
     assert(id == deserializedMessage->id_);
     assert(strcmp(client, deserializedMessage->client) == 0);
     assert(port == deserializedMessage->port);
+
+    std::cout << "works for registry" << "\n";
 }
 
 void testNetwork() {
@@ -169,6 +203,8 @@ void testNetwork() {
     delete serverAddr;
     delete[] ips;
     delete[] pids;
+
+    std::cout << "works for network" << "\n";
 }
 
 /**
@@ -178,15 +214,16 @@ void testNetwork() {
  * @return
  */
 int main(int argc, char** argv) {
-//    testFloat();
-//    testSizeT();
-//    testStringArr();
-//    testFloatArr();
-//    testMessageDirectory();
-//    testMessageRegister();
+    testFloat();
+    testSizeT();
+    testStringArr();
+    testFloatArr();
+    testMessageDirectory();
+    testMessageGet();
+    testMessageRegister();
     testNetwork();
-//    std::cout << "ALL PASSED";
-//    Trivial triv(0);
-//    triv.run_();
+    std::cout << "ALL PASSED";
+    Trivial triv(0);
+    triv.run_();
     return 0;
 }

@@ -82,8 +82,7 @@ public:
         }
         return buffer;
     }
-
-
+    
     /**
      * serialize the array of strings
      * @param arr - the array
@@ -240,6 +239,30 @@ public:
         }
     }
 
+    char* serializeGet(Get* m) {
+        std::ostringstream os;
+        os<<"G";
+        os<<len(m->sender_);
+        os<<"|";
+        os<<m->sender_;
+        os<<len(m->target_);
+        os<<"|";
+        os<<m->target_;
+        os<<len(m->id_);
+        os<<"|";
+        os<<m->id_;
+        os<<(strlen(m->type));
+        os<<"|";
+        os<<(m->type);
+        os<<(strlen(m->key));
+        os<<("|");
+        os<<(m->key);
+
+        std::string data = os.str();
+        char* buffer = strdup(data.c_str());
+        return buffer;
+    }
+
     char* serializeRegister(Register* m) {
         std::ostringstream os;
         os<<"R";
@@ -315,6 +338,23 @@ public:
         } else if (buffer[0] == 'R') {
             return deserializeRegister(buffer);
         }
+    }
+
+    Get* deserializeGet(char* buffer) {
+        size_t curIndex = 1;
+        std::string ser = buffer;
+        size_t sender = nextSizeT(ser, curIndex);
+        size_t target = nextSizeT(ser, curIndex);
+        size_t id = nextSizeT(ser, curIndex);
+        std::string type = nextString(ser, curIndex);
+        std::string key = nextString(ser, curIndex);
+        char* t = strdup(type.c_str());
+        char* k = strdup(key.c_str());
+        Get* g = new Get(t, k);
+        g->sender_ = sender;
+        g->target_ = target;
+        g->id_ = id;
+        return g;
     }
 
     Register* deserializeRegister(char* buffer) {
