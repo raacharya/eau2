@@ -479,7 +479,7 @@ class DistBoolColumn : public DistColumn {
          */
         DistBoolColumn(String* id, Distributable* kv_store) {
             array = new DistEffBoolArr(id, kv_store);
-            type = 'I';
+            type = 'B';
         }
 
         /**
@@ -489,7 +489,7 @@ class DistBoolColumn : public DistColumn {
          */
         DistBoolColumn(BoolColumn& from, String* id, Distributable* kv_store) {
             array = new DistEffBoolArr(*from.array, id, kv_store);
-            type = 'I';
+            type = 'B';
         }
 
         /**
@@ -693,7 +693,7 @@ class DistFloatColumn : public DistColumn {
          */
         DistFloatColumn(String* id, Distributable* kv_store) {
             array = new DistEffFloatArr(id, kv_store);
-            type = 'I';
+            type = 'F';
         }
 
         /**
@@ -703,7 +703,7 @@ class DistFloatColumn : public DistColumn {
          */
         DistFloatColumn(FloatColumn& from, String* id, Distributable* kv_store) {
             array = new DistEffFloatArr(*from.array, id, kv_store);
-            type = 'I';
+            type = 'F';
         }
 
         /**
@@ -909,7 +909,7 @@ class DistStringColumn : public DistColumn {
          */
         DistStringColumn(String* id, Distributable* kv_store) {
             array = new DistEffStrArr(id, kv_store);
-            type = 'I';
+            type = 'S';
         }
 
         /**
@@ -919,7 +919,7 @@ class DistStringColumn : public DistColumn {
          */
         DistStringColumn(StringColumn& from, String* id, Distributable* kv_store) {
             array = new DistEffStrArr(*from.array, id, kv_store);
-            type = 'I';
+            type = 'S';
         }
 
         /**
@@ -1148,6 +1148,7 @@ class DistFixedColArray : public Object {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
                 String* col_id = id_var->clone();
+                col_id->concat("-");
                 col_id->concat(buf);
                 if (col->get_type() == 'I') {
                     DistIntColumn* copy = new DistIntColumn(*col->as_int(), col_id, kvStore);
@@ -1172,13 +1173,14 @@ class DistFixedColArray : public Object {
         DistFixedColArray(DistEffCharArr* types, String* id_var, Distributable* kvStore_var) : Object() {
             id = id_var;
             kvStore = kvStore_var;
-
             used = getSizeTFromKey("used");
             capacity = getSizeTFromKey("capacity");
+            array = new DistColumn*[capacity];
             for (size_t i = 0; i < used; i += 1) {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
                 String* col_id = id_var->clone();
+                col_id->concat("-");
                 col_id->concat(buf);
                 if (types->get(i) == 'I') {
                     DistIntColumn* copy = new DistIntColumn(col_id, kvStore);
@@ -1198,10 +1200,12 @@ class DistFixedColArray : public Object {
 
         size_t getSizeTFromKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             Key* sizeTKey = new Key(idClone, 0);
             size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
             delete sizeTKey;
+            return toReturn;
         }
 
         size_t length(size_t s) {
@@ -1216,6 +1220,7 @@ class DistFixedColArray : public Object {
 
         Key* createKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             return new Key(idClone, 0);
         }
@@ -1441,10 +1446,12 @@ class DistEffColArr : public Object {
 
         size_t getSizeTFromKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             Key* sizeTKey = new Key(idClone, 0);
             size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
             delete sizeTKey;
+            return toReturn;
         }
 
         /**
@@ -1459,8 +1466,7 @@ class DistEffColArr : public Object {
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
-
-
+            array = new DistFixedColArray*[capacity];
             kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
             kvStore->sendToNode(createKey("capacity"), createValue(capacity));
             kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
@@ -1487,6 +1493,7 @@ class DistEffColArr : public Object {
 
         Key* createKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             return new Key(idClone, 0);
         }

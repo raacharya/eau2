@@ -137,10 +137,12 @@ class DistEffIntArr : public Object {
 
         size_t getSizeTFromKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             Key* sizeTKey = new Key(idClone, 0);
             size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
             delete sizeTKey;
+            return toReturn;
         }
 
         /**
@@ -180,6 +182,7 @@ class DistEffIntArr : public Object {
 
         Key* createKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             return new Key(idClone, 0);
         }
@@ -205,7 +208,7 @@ class DistEffIntArr : public Object {
         int get(size_t idx) {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
-            sprintf(buf, "%zu", idx);
+            sprintf(buf, "%zu", chunkIdx);
             Value* val = kvStore->getFromNode(createKey(buf));
             Object* obj = val->obj;
             FixedIntArray* curChunk = dynamic_cast<FixedIntArray*>(obj);
@@ -373,10 +376,12 @@ class DistEffFloatArr : public Object {
 
         size_t getSizeTFromKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             Key* sizeTKey = new Key(idClone, 0);
             size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
             delete sizeTKey;
+            return toReturn;
         }
 
         /**
@@ -416,6 +421,7 @@ class DistEffFloatArr : public Object {
 
         Key* createKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             return new Key(idClone, 0);
         }
@@ -441,7 +447,7 @@ class DistEffFloatArr : public Object {
         float get(size_t idx) {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
-            sprintf(buf, "%zu", idx);
+            sprintf(buf, "%zu", chunkIdx);
             Value* val = kvStore->getFromNode(createKey(buf));
             Object* obj = val->obj;
             FixedFloatArray* curChunk = dynamic_cast<FixedFloatArray*>(obj);
@@ -597,10 +603,12 @@ class DistEffBoolArr : public Object {
 
         size_t getSizeTFromKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             Key* sizeTKey = new Key(idClone, 0);
             size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
             delete sizeTKey;
+            return toReturn;
         }
 
         /**
@@ -640,6 +648,7 @@ class DistEffBoolArr : public Object {
 
         Key* createKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             return new Key(idClone, 0);
         }
@@ -665,7 +674,7 @@ class DistEffBoolArr : public Object {
         bool get(size_t idx) {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
-            sprintf(buf, "%zu", idx);
+            sprintf(buf, "%zu", chunkIdx);
             Value* val = kvStore->getFromNode(createKey(buf));
             Object* obj = val->obj;
             FixedBoolArray* curChunk = dynamic_cast<FixedBoolArray*>(obj);
@@ -825,10 +834,12 @@ class DistEffCharArr : public Object {
 
         size_t getSizeTFromKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             Key* sizeTKey = new Key(idClone, 0);
             size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
             delete sizeTKey;
+            return toReturn;
         }
 
         /**
@@ -868,6 +879,7 @@ class DistEffCharArr : public Object {
 
         Key* createKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             return new Key(idClone, 0);
         }
@@ -893,7 +905,7 @@ class DistEffCharArr : public Object {
         char get(size_t idx) {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
-            sprintf(buf, "%zu", idx);
+            sprintf(buf, "%zu", chunkIdx);
             Value* val = kvStore->getFromNode(createKey(buf));
             Object* obj = val->obj;
             FixedCharArray* curChunk = dynamic_cast<FixedCharArray*>(obj);
@@ -1059,10 +1071,12 @@ class DistEffStrArr : public Object {
 
         size_t getSizeTFromKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             Key* sizeTKey = new Key(idClone, 0);
             size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
             delete sizeTKey;
+            return toReturn;
         }
 
         bool equals(Object* other) {
@@ -1111,6 +1125,7 @@ class DistEffStrArr : public Object {
 
         Key* createKey(char* suffix) {
             String* idClone = id->clone();
+            idClone->concat("-");
             idClone->concat(suffix);
             return new Key(idClone, 0);
         }
@@ -1130,7 +1145,7 @@ class DistEffStrArr : public Object {
         String* get(size_t idx) {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
-            sprintf(buf, "%zu", idx);
+            sprintf(buf, "%zu", chunkIdx);
             FixedStrArray* curChunk = dynamic_cast<FixedStrArray*>(kvStore->getFromNode(createKey(buf))->obj);
             return curChunk->get(idx % chunkSize);
         }

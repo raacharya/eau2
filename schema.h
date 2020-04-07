@@ -129,7 +129,6 @@ class DistSchema : public Object {
             String* types_id = id->clone();
             types_id->concat("-types");
             types = new DistEffCharArr(*from.types, types_id, kvStore);
-
         }
 
         /** Create an empty schema **/

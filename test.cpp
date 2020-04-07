@@ -188,24 +188,24 @@ void testMessageRegister() {
     std::cout << "works for registry" << "\n";
 }
 
-void testNetwork() {
-    size_t num_nodes = 5;
-    NetworkIP* ips = new NetworkIP[num_nodes];
-    std::thread* pids = new std::thread[num_nodes];
-    String* serverAddr = new String("127.0.0.1");
-    pids[0] = std::thread(&NetworkIP::server_init, ips[0], 0, 9000);
-    for (size_t i = 1; i < num_nodes; i += 1) {
-        pids[i] = std::thread(&NetworkIP::client_init, ips[i], i, 9000 + i, serverAddr->c_str(), 9000);
-    }
-    for (size_t i = 0; i < num_nodes; i += 1) {
-        pids[i].join();
-    }
-    delete serverAddr;
-    delete[] ips;
-    delete[] pids;
-
-    std::cout << "works for network" << "\n";
-}
+//void testNetwork() {
+//    size_t num_nodes = 5;
+//    NetworkIP* ips = new NetworkIP[num_nodes];
+//    std::thread* pids = new std::thread[num_nodes];
+//    String* serverAddr = new String("127.0.0.1");
+//    pids[0] = std::thread(&NetworkIP::server_init, ips[0], 0, 9000);
+//    for (size_t i = 1; i < num_nodes; i += 1) {
+//        pids[i] = std::thread(&NetworkIP::client_init, ips[i], i, 9000 + i, serverAddr->c_str(), 9000);
+//    }
+//    for (size_t i = 0; i < num_nodes; i += 1) {
+//        pids[i].join();
+//    }
+//    delete serverAddr;
+//    delete[] ips;
+//    delete[] pids;
+//
+//    std::cout << "works for network" << "\n";
+//}
 
 /**
  * Runs our use cases
@@ -214,15 +214,14 @@ void testNetwork() {
  * @return
  */
 int main(int argc, char** argv) {
-    testFloat();
-    testSizeT();
-    testStringArr();
-    testFloatArr();
-    testMessageDirectory();
-    testMessageGet();
-    testMessageRegister();
-    testNetwork();
-    std::cout << "ALL PASSED";
+//    testFloat();
+//    testSizeT();
+//    testStringArr();
+//    testFloatArr();
+//    testMessageDirectory();
+//    testMessageGet();
+//    testMessageRegister();
+//    testNetwork();
     Trivial triv(0);
     triv.run_();
     return 0;
