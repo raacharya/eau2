@@ -161,6 +161,42 @@ void testMessageGet() {
     std::cout << "works for get" << "\n";
 }
 
+void testMessageSend() {
+
+    size_t sender = 90;
+    size_t target = 91;
+    size_t id = 1;
+
+    FixedIntArray* arr = new FixedIntArray(5);
+    for(size_t i = 0; i < 5; i++) {
+        arr->pushBack(1);
+    }
+
+    Serializer* serializer = new Serializer();
+    char* type = "I";
+    Chunk c;
+    c.fi = arr;
+
+    Send* s = new Send(c, type);
+
+    s->sender_ = sender;
+    s->target_ = target;
+    s->id_ = id;
+
+    char* serializedMessage = serializer->serializeSend(s);
+
+    std::cout << serializedMessage;
+//    Get* get = dynamic_cast<Get *>(serializer->deserializeGet(serializedMessage));
+//
+//    assert(sender == get->sender_);
+//    assert(target == get->target_);
+//    assert(id == get->id_);
+//    assert(strcmp(type, get->type) == 0);
+//    assert(strcmp(key, get->key) == 0);
+
+    std::cout << "works for send" << "\n";
+}
+
 /**
  * Ensures that the serializer correctly serializes and deserializes a message
  */
@@ -220,6 +256,7 @@ int main(int argc, char** argv) {
     testFloatArr();
     testMessageDirectory();
     testMessageGet();
+    //testMessageSend();
     testMessageRegister();
     testNetwork();
     std::cout << "ALL PASSED";

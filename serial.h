@@ -50,6 +50,17 @@ public:
         return buffer;
     }
 
+    /**
+     * serialize the int
+     * @param num = the int
+     * @return - the serialized value
+     */
+    char* serialize(int num) {
+        char* buffer = new char[sizeof(num)];
+        memcpy(buffer, &num, sizeof(num));
+        return buffer;
+    }
+
     /**buffer[];
      * Serializes a fixed string array
      * @param arr - the array
@@ -82,7 +93,103 @@ public:
         }
         return buffer;
     }
-    
+
+    /**
+     * Serialize this fixed int array
+     * @param arr
+     * @return
+     */
+    char* serializeFixedIntArray(FixedIntArray* arr) {
+        size_t bufferSize = arr->used + 1;
+
+        for(size_t i = 0; i < arr->used; i++) {
+            bufferSize += sizeof(arr->get(i));
+        }
+
+        char* buffer = new char[bufferSize];
+        buffer[0] = arr->used;
+
+        size_t index = 1;
+        size_t word = 0;
+
+        while(index < bufferSize) {
+            int currInt = arr->get(word);
+            if(index != bufferSize - 1) {
+                buffer[index] = sizeof(currInt);
+                index += 1;
+            }
+            char* serialized = serialize(currInt);
+            for(size_t i = 0; i < sizeof(currInt); i++) {
+                buffer[index] = serialized[i];
+                index += 1;
+            }
+            word += 1;
+        }
+        return buffer;
+    }
+
+    /**
+     * Serialize this fixed float array
+     * @param arr
+     * @return
+     */
+    char* serializeFixedFloatArray(FixedFloatArray* arr) {
+        size_t bufferSize = arr->used + 1;
+
+        for(size_t i = 0; i < arr->used; i++) {
+            bufferSize += sizeof(arr->get(i));
+        }
+
+        char* buffer = new char[bufferSize];
+        buffer[0] = arr->used;
+
+        size_t index = 1;
+        size_t word = 0;
+
+        while(index < bufferSize) {
+            float currFloat = arr->get(word);
+            if(index != bufferSize - 1) {
+                buffer[index] = sizeof(currFloat);
+                index += 1;
+            }
+            char* serialized = serialize(currFloat);
+            for(size_t i = 0; i < sizeof(currFloat); i++) {
+                buffer[index] = serialized[i];
+                index += 1;
+            }
+            word += 1;
+        }
+        return buffer;
+    }
+
+    /**
+     * Serialize this fixed boolean array
+     * @param arr
+     * @return
+     */
+    char* serializeFixedBoolArray(FixedBoolArray* arr) {
+        size_t bufferSize = arr->used + 1;
+
+        char* buffer = new char[bufferSize];
+
+        buffer[0] = arr->used;
+
+        for(size_t i = 1; i < arr->used; i++) {
+            char next;
+            if(arr->get(i)) {
+                next = 1;
+            }
+            else {
+                next = 0;
+            }
+            buffer[i] = next;
+        }
+
+        buffer[strlen(buffer) - 1] = '\0';
+
+        return buffer;
+    }
+
     /**
      * serialize the array of strings
      * @param arr - the array
@@ -139,30 +246,81 @@ public:
         return arr;
     }
 
-        /**
-         * deserialize the serialized fixed string array
-         * @param buffer - the serialized form of the string array
-         * @return - the string array in its original format
-         */
-        FixedStrArray* deserializeFixedStringArr(char* buffer) {
-            size_t index = 1;
-            char* curr;
-            FixedStrArray* arr = new FixedStrArray(buffer[0]);
-            size_t total = strlen(buffer - 1);
 
-            while(index < total) {
-                size_t iter = buffer[index];
+    FixedStrArray* deserializeFixedStringArr(char* buffer) {
+        size_t index = 1;
+        char* curr;
+        FixedStrArray* arr = new FixedStrArray(buffer[0]);
+        size_t total = strlen(buffer - 1);
+
+        while(index < total) {
+            size_t iter = buffer[index];
+            index += 1;
+            curr = new char[iter];
+            for(size_t i = 0; i < iter; i++) {
+                curr[i] = buffer[index];
                 index += 1;
-                curr = new char[iter];
-                for(size_t i = 0; i < iter; i++) {
-                    curr[i] = buffer[index];
-                    index += 1;
-                }
-                arr->pushBack(new String(curr));
             }
-
-            return arr;
+            arr->pushBack(new String(curr));
         }
+
+        return arr;
+    }
+
+
+    FixedIntArray* deserializeFixedIntArr(char* buffer) {
+        size_t index = 1;
+        char* curr;
+        FixedIntArray* arr = new FixedIntArray(buffer[0]);
+        size_t total = strlen(buffer-1);
+
+        while(index < total) {
+            size_t iter = buffer[index];
+            index += 1;
+            curr = new char[iter];
+            for(size_t i = 0; i < iter; i++) {
+                curr[i] = buffer[index];
+                index += 1;
+            }
+            arr->pushBack(*reinterpret_cast<int *> (curr));
+        }
+
+        return arr;
+    }
+
+    FixedIntArray* deserializeFixedBoolArr(char* buffer) {
+        FixedBoolArray* arr = new FixedBoolArray(buffer[0]);
+
+        size_t total = strlen(buffer-1);
+
+        for(size_t i = 1; i < total; i++) {
+            if(buffer[i] == '0') {
+                arr->pushBack(false);
+            } else {
+                arr->pushBack(true);
+            }
+        }
+    }
+
+    FixedFloatArray* deserializeFixedFloatArr(char* buffer) {
+        size_t index = 1;
+        char* curr;
+        FixedFloatArray* arr = new FixedFloatArray(buffer[0]);
+        size_t total = strlen(buffer-1);
+
+        while(index < total) {
+            size_t iter = buffer[index];
+            index += 1;
+            curr = new char[iter];
+            for(size_t i = 0; i < iter; i++) {
+                curr[i] = buffer[index];
+                index += 1;
+            }
+            arr->pushBack(*reinterpret_cast<float *> (curr));
+        }
+
+        return arr;
+    }
 
     /**
      * serialize the float array
@@ -237,6 +395,41 @@ public:
             char* buf = serializeRegister(dynamic_cast<Register*>(m));
             return buf;
         }
+    }
+
+    char* serializeSend(Send* s) {
+        std::ostringstream os;
+        os<<"S";
+        os<<len(s->sender_);
+        os<<"|";
+        os<<s->sender_;
+        os<<len(s->target_);
+        os<<"|";
+        os<<s->target_;
+        os<<len(s->id_);
+        os<<"|";
+        os<<s->id_;
+        char* type = s->type;
+        char* serializedChunk;
+        if(strcmp(type, "I") == 0) {
+            serializedChunk = serializeFixedIntArray(s->c.fi);
+        } else if(strcmp(type, "F") == 0) {
+            serializedChunk = serializeFixedFloatArray(s->c.ff);
+        } else if(strcmp(type, "B") == 0) {
+            serializedChunk = serializeFixedBoolArray(s->c.fb);
+        } else if(strcmp(type, "S") == 0) {
+            serializedChunk = serializeFixedStrArray(s->c.fs);
+        }
+
+        os<<1;
+        os<<"|";
+        os<<s->type;
+        os<<strlen(serializedChunk);
+        os<<"|";
+        os<<serializedChunk;
+        std::string data = os.str();
+        char* buffer = strdup(data.c_str());
+        return buffer;
     }
 
     char* serializeGet(Get* m) {

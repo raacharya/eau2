@@ -4,4 +4,4 @@
 #pragma  once
 
 
-enum class MsgKind { Ack, Nack, Put, Reply,  Get, WaitAndGet, Status, Kill, Register,  Directory };
+enum class MsgKind { Ack, Nack, Put, Reply,  Get, WaitAndGet, Status, Kill, Register,  Directory, Send };

@@ -98,7 +98,7 @@ class Get : public Message {
 
 union Chunk  {
     FixedIntArray* fi;
-    FixedIntArray* ff;
+    FixedFloatArray* ff;
     FixedBoolArray* fb;
     FixedStrArray* fs;
 };
@@ -111,5 +111,6 @@ class Send : public Message {
         Send(Chunk c_, char* type_) {
             c = c_;
             type = type_;
+            kind_ = MsgKind::Send;
         }
 };
