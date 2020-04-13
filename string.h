@@ -86,7 +86,7 @@ class String : public Object {
         }
 
         /** Concat char* to this string. */
-        void concat(char* csr) {
+        void concat(const char* csr) {
             size_t newSize = size_ + strlen(csr) + 1;
             char* newCstr = new char[newSize];
             strcpy(newCstr, cstr_);

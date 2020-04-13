@@ -1150,6 +1150,7 @@ class DistFixedColArray : public Object {
                 String* col_id = id_var->clone();
                 col_id->concat("-");
                 col_id->concat(buf);
+                delete buf;
                 if (col->get_type() == 'I') {
                     DistIntColumn* copy = new DistIntColumn(*col->as_int(), col_id, kvStore);
                     array[i] = copy;
@@ -1444,7 +1445,7 @@ class DistEffColArr : public Object {
             }
         }
 
-        size_t getSizeTFromKey(char* suffix) {
+        size_t getSizeTFromKey(const char* suffix) {
             String* idClone = id->clone();
             idClone->concat("-");
             idClone->concat(suffix);
@@ -1477,6 +1478,7 @@ class DistEffColArr : public Object {
                 String* col_id = id_var->clone();
                 col_id->concat("-");
                 col_id->concat(buf);
+                delete buf;
                 array[i] = new DistFixedColArray(*from.chunks[i], col_id, kvStore);
             }
         }

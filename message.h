@@ -81,10 +81,10 @@ class Directory : public Message {
 
 class Get : public Message {
     public:
-        char* type; // one of 'I', 'F', 'B', 'S'
+        char type; // one of 'I', 'F', 'B', 'S'
         char* key;
 
-        Get(char* type_, char* key_) {
+        Get(char type_, char* key_) {
             type = type_;
             key = key_;
             kind_ = MsgKind::Get;
@@ -105,10 +105,10 @@ union Chunk  {
 
 class Send : public Message {
     public:
-        Chunk c;
-        char* type;
+        Chunk* c;
+        char type;
 
-        Send(Chunk c_, char* type_) {
+        Send(Chunk* c_, char type_) {
             c = c_;
             type = type_;
             kind_ = MsgKind::Send;

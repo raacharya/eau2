@@ -450,6 +450,7 @@ class DistEffFloatArr : public Object {
             sprintf(buf, "%zu", chunkIdx);
             Value* val = kvStore->getFromNode(createKey(buf));
             Object* obj = val->obj;
+            delete[] buf;
             FixedFloatArray* curChunk = dynamic_cast<FixedFloatArray*>(obj);
             return curChunk->get(idx % chunkSize);
         }
@@ -864,6 +865,7 @@ class DistEffCharArr : public Object {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
                 kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
+                delete[] buf;
             }
         }
 

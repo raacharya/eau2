@@ -5,11 +5,11 @@
 
 class Application {
     public:
-        KDStore kd = NULL;
+        KDStore* kd;
 
 
         Application(int idx) {
-            kd = KDStore(idx);
+            kd = new KDStore(idx);
         }
 
         virtual void run_() {
@@ -29,9 +29,9 @@ class Trivial : public Application {
                 sum += i;
             }
             Key key("triv",0);
-            DistDataFrame* df = DistDataFrame::fromArray(&key, &kd, SZ, vals);
+            DistDataFrame* df = DistDataFrame::fromArray(&key, kd, SZ, vals);
             assert(df->get_float(0,1) == 1);
-            DistDataFrame* df2 = kd.get(key);
+            DistDataFrame* df2 = kd->get(key);
             for (size_t i = 0; i < SZ; ++i) {
                 float cur = df2->get_float(0,i);
                 sum -= cur;

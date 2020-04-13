@@ -127,9 +127,8 @@ class NetworkIP : public NetworkIfc {
             assert(conn >= 0 && "Unable to create client socket");
             if (connect(conn, (sockaddr*)&tgt.address, sizeof(tgt.address)) < 0)
                 assert(false && "Unable to connect to remote node");
-            Serializer ser{};
-            char* buf = ser.serialize(msg);
-            size_t size = strlen(buf);
+            size_t size = 0;
+            char* buf = Serializer::serialize(msg, size);
             send(conn, &size, sizeof(size_t), 0);
             send(conn, buf, size, 0);
             close(conn);
@@ -144,8 +143,7 @@ class NetworkIP : public NetworkIfc {
             char* buf = new char[size];
             int rd = 0;
             while (rd != size) rd += read(req, buf + rd, size - rd);
-            Serializer ser{};
-            Message* msg = ser.deserializeMessage(buf);
+            Message* msg = Serializer::deserializeMessage(buf);
             close(req);
             return msg;
         }

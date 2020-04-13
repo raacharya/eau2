@@ -29,7 +29,7 @@ class DataFrame : public Object {
 
         /** Create a data frame from a schema and columns. All columns are created
           * empty. */
-        DataFrame(Schema &schemaRef) {
+        explicit DataFrame(Schema &schemaRef) {
             schema = new Schema();
             columns = new EffColArr();
             for (int i = 0; i < schemaRef.types->size(); i += 1) {
@@ -225,7 +225,7 @@ class DataFrame : public Object {
         /** Create a new dataframe, constructed from rows for which the given Rower
           * returned true from its accept method. */
         DataFrame *filter(Rower &r) {
-            DataFrame* newDf = new DataFrame(*schema);
+            auto* newDf = new DataFrame(*schema);
             for(size_t i = 0; i < schema->length(); i++) {
                 Row* row = new Row(*schema);
                 fill_row(i, *row);
@@ -241,7 +241,7 @@ class DataFrame : public Object {
 
         /** Print the dataframe in SoR format to standard output. */
         void print() {
-            PrintRower* pr = new PrintRower();
+            auto* pr = new PrintRower();
             map(*pr);
             delete pr;
         }
@@ -251,7 +251,7 @@ class DataFrame : public Object {
          * @brief Destroy the Data Frame object
          *
          */
-        ~DataFrame() {
+        ~DataFrame() override {
             delete columns;
             delete schema;
         }
@@ -317,7 +317,7 @@ class DistDataFrame : public Object {
          * @brief Destroy the Data Frame object
          *
          */
-        ~DistDataFrame() {
+        ~DistDataFrame() override {
             delete columns;
             delete schema;
         }
@@ -337,7 +337,7 @@ class KDStore : public Object {
         Distributable* kvStore;
 
 
-        KDStore(int idx) : Object() {
+        explicit KDStore(int idx) : Object() {
             index = idx;
             kvStore = new Distributable(index);
         }
@@ -358,7 +358,7 @@ class KDStore : public Object {
  * @return
  */
 DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, int* vals) {
-    IntColumn* col = new IntColumn();
+    auto* col = new IntColumn();
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
@@ -367,13 +367,13 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     DataFrame df(s);
     df.add_column(col, nullptr);
 
-    DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
+    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
     return newDf;
 }
 
 DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, float* vals) {
-    FloatColumn* col = new FloatColumn();
+    auto* col = new FloatColumn();
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
@@ -382,7 +382,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     DataFrame df(s);
     df.add_column(col, nullptr);
 
-    DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
+    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
     return newDf;
 }
@@ -396,7 +396,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
  * @return
  */
 DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, bool* vals) {
-    BoolColumn* col = new BoolColumn();
+    auto* col = new BoolColumn();
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
@@ -405,7 +405,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     DataFrame df(s);
     df.add_column(col, nullptr);
 
-    DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
+    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
     return newDf;
 }
@@ -419,7 +419,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
  * @return
  */
 DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, String** vals) {
-    StringColumn* col = new StringColumn();
+    auto* col = new StringColumn();
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
@@ -428,7 +428,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     DataFrame df(s);
     df.add_column(col, nullptr);
 
-    DistDataFrame* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
+    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
     return newDf;
 }
