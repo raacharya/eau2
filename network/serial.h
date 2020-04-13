@@ -2,8 +2,8 @@
 // Created by Rahul Acharya on 2/25/20.
 //
 #pragma once
-#include "object.h"
-#include "efficientArray.h"
+#include "../util/object.h"
+#include "../array/efficientArray.h"
 #include "message.h"
 #include "msgKind.h"
 #include <stdlib.h>

@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "object.h"
+#include "../util/object.h"
 
 /**
  * Enum for the different types of SoR columns this code supports.

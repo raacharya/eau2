@@ -1,6 +1,6 @@
 #pragma once
 #include "array.h"
-#include "string.h"
+#include "../util/string.h"
 #include <stdarg.h>
 
 
@@ -188,13 +188,13 @@ class DistEffIntArr : public Object {
         }
 
         Value* createValue(size_t s) {
-            Value* val = new Value;
+            auto* val = new Value;
             val->st = s;
             return val;
         }
 
         Value* createValue(FixedIntArray* fixedIntArray) {
-            Value* val = new Value;
+            auto* val = new Value;
             val->obj = fixedIntArray;
             return val;
         }

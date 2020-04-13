@@ -1,4 +1,4 @@
-#include "network.h"
+#include "../network/network.h"
 
 #define PORT "9034" // the port client will be connecting to
 

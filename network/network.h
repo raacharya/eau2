@@ -13,7 +13,7 @@
 #include <poll.h>
 #include <iostream>
 #include "serial.h"
-#include "efficientArray.h"
+#include "../array/efficientArray.h"
 #include <thread>
 #include <map>
 

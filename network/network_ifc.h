@@ -1,5 +1,5 @@
 #pragma once
-#include "object.h"
+#include "../util/object.h"
 
 class NetworkIfc : public Object {
     public:

@@ -1,13 +1,10 @@
-#pragma once
-
-#include "object.h"
+#include "../util/object.h"
 #include "schema.h"
-#include "array.h"
+#include "../array/array.h"
 #include "column.h"
 #include "row.h"
 #include "rower.h"
-
-class KDStore;
+#include <thread>
 
 /****************************************************************************
  * DataFrame::
@@ -16,7 +13,7 @@ class KDStore;
  * holds values of the same type (I, S, B, F). A dataframe has a schema that
  * describes it.
  */
-class DataFrame : public Object {
+class ModifiedDataFrame : public Object {
 
     public:
 
@@ -24,12 +21,12 @@ class DataFrame : public Object {
         EffColArr *columns;
 
         /** Create a data frame with the same columns as the given df but with no rows or rownmaes */
-        DataFrame(DataFrame &df) : DataFrame(*df.schema) {
+        ModifiedDataFrame(ModifiedDataFrame &df) : ModifiedDataFrame(*df.schema) {
         }
 
         /** Create a data frame from a schema and columns. All columns are created
           * empty. */
-        explicit DataFrame(Schema &schemaRef) {
+        ModifiedDataFrame(Schema &schemaRef) {
             schema = new Schema();
             columns = new EffColArr();
             for (int i = 0; i < schemaRef.types->size(); i += 1) {
@@ -57,8 +54,7 @@ class DataFrame : public Object {
           * is external, and appears as the last column of the dataframe, the
           * name is optional and external. A nullptr colum is undefined. */
         void add_column(Column *col, String *name) {
-            assert(col != nullptr);
-            //assert(nrows() == col->size());
+            assert(columns->size() == 0 || columns->get(0)->size() == 0);
             Column *copy;
             if (col->get_type() == 'I') {
                 copy = new IntColumn(*(col->as_int()));
@@ -71,21 +67,17 @@ class DataFrame : public Object {
             }
             columns->pushBack(copy);
             schema->add_column(copy->get_type(), name);
-            if(nrows() == 0) {
-                for(size_t i = 0; i < col->size(); i++) {
-                    schema->add_row(nullptr);
-                }
-            }
         }
 
         /** Return the value at the given column and row. Accessing rows or
-         *  columns out of bounds, or request the wrong type throws an error.*/
+         *  columns out of bounds, or request the wrong type is undefined.*/
         int get_int(size_t col, size_t row) {
             assert(0 <= col && col < schema->width());
             assert(0 <= row && row < schema->length());
             assert(columns->get(col)->get_type() == 'I');
             return columns->get(col)->as_int()->get(row);
         }
+
         bool get_bool(size_t col, size_t row) {
             assert(0 <= col && col < schema->width());
             assert(0 <= row && row < schema->length());
@@ -119,7 +111,7 @@ class DataFrame : public Object {
 
         /** Set the value at the given column and row to the given value.
           * If the column is not  of the right type or the indices are out of
-          * bound, then we throw an error */
+          * bound, the result is undefined. */
         void set(size_t col, size_t row, int val) {
             assert(0 <= col && col < schema->width());
             assert(0 <= row && row < schema->length());
@@ -150,7 +142,7 @@ class DataFrame : public Object {
 
         /** Set the fields of the given row object with values from the columns at
           * the given offset.  If the row is not form the same schema as the
-          * dataframe, then we throw an error
+          * dataframe, results are undefined.
           */
         void fill_row(size_t idx, Row &row) {
             for (int col = 0; col < columns->size(); col++) {
@@ -201,11 +193,16 @@ class DataFrame : public Object {
 
         /** Visit rows in order */
         void map(Rower &r) {
-            for(size_t i = 0; i < 50; i++) {
+            vmap(&r, 0, schema->length());
+        }
+
+        /** Visit rows from start (inclusive) to end (exclusive) */
+        void vmap(Rower* r, size_t start, size_t end) {
+            for(size_t i = start; i < end; i++) {
                 Row* row = new Row(*schema);
                 row->set_idx(i);
                 fill_row(i, *row);
-                r.accept(*row);
+                r->accept(*row);
                 for(size_t j = 0; j < row->width(); j++) {
                     char colType = columns->get(j)->get_type();
                     if (colType == 'I') {
@@ -222,10 +219,37 @@ class DataFrame : public Object {
             }
         }
 
+
+        /**
+         * @brief Use multithreading to improve the performance of map and use concurrency
+         * 
+         * @param r 
+         */
+        void pmap(Rower& r) {
+            int numThreads = 10;
+            std::thread pool[numThreads];
+            Rower* rowerArr[numThreads];
+            size_t len = schema->length();
+            size_t interval = len / numThreads;
+            for (int i = 0; i < numThreads; i += 1) {
+                size_t start = interval * i;
+                size_t end = std::min(start + interval, len);
+                rowerArr[i] = r.clone();
+                pool[i] = std::thread(&ModifiedDataFrame::vmap, this, rowerArr[i], start, end);
+            }
+            for (int i = 0; i < numThreads; i += 1) {
+                pool[i].join();
+            }
+            for (int i = numThreads - 2; i >= 0; i -= 1) {
+                rowerArr[i]->join(rowerArr[i + 1]);
+            }
+            r.join_delete(rowerArr[0]);
+        }
+
         /** Create a new dataframe, constructed from rows for which the given Rower
           * returned true from its accept method. */
-        DataFrame *filter(Rower &r) {
-            auto* newDf = new DataFrame(*schema);
+        ModifiedDataFrame *filter(Rower &r) {
+            ModifiedDataFrame* newDf = new ModifiedDataFrame(*schema);
             for(size_t i = 0; i < schema->length(); i++) {
                 Row* row = new Row(*schema);
                 fill_row(i, *row);
@@ -241,226 +265,13 @@ class DataFrame : public Object {
 
         /** Print the dataframe in SoR format to standard output. */
         void print() {
-            auto* pr = new PrintRower();
+            PrintRower* pr = new PrintRower();
             map(*pr);
             delete pr;
         }
 
-
-        /**
-         * @brief Destroy the Data Frame object
-         *
-         */
-        ~DataFrame() override {
+        ~ModifiedDataFrame() {
             delete columns;
             delete schema;
         }
 };
-
-/****************************************************************************
- * DistDataFrame::
- *
- * A DistDataFrame is a DataFrame which is distributed among many nodes
- */
-class DistDataFrame : public Object {
-
-    public:
-
-        DistSchema *schema;
-        DistEffColArr *columns;
-        String* id;
-        Distributable* kvStore;
-
-        DistDataFrame(String* id_var, Distributable* kvStore_var) {
-            kvStore = kvStore_var;
-            id = id_var->clone();
-            id->concat("-df");
-            schema = new DistSchema(id, kvStore);
-            String* cols_id = id->clone();
-            cols_id->concat("-cols");
-            columns = new DistEffColArr(schema->types, cols_id, kvStore);
-        }
-
-        DistDataFrame(DataFrame &from, String* id_var, Distributable* kvStore_var) {
-            kvStore = kvStore_var;
-            id = id_var->clone();
-            id->concat("-df");
-            schema = new DistSchema(*from.schema, id, kvStore);
-            String* cols_id = id->clone();
-            cols_id->concat("-cols");
-            columns = new DistEffColArr(*from.columns, cols_id, kvStore);
-        }
-
-        /** Return the value at the given column and row. Accessing rows or
-         *  columns out of bounds, or request the wrong type throws an error.*/
-        int get_int(size_t col, size_t row) {
-            assert(columns->get(col)->get_type() == 'I');
-            return columns->get(col)->as_int()->get(row);
-        }
-        bool get_bool(size_t col, size_t row) {
-            assert(columns->get(col)->get_type() == 'B');
-            return columns->get(col)->as_bool()->get(row);
-        }
-
-        float get_float(size_t col, size_t row) {
-            assert(columns->get(col)->get_type() == 'F');
-            return columns->get(col)->as_float()->get(row);
-        }
-
-        String *get_string(size_t col, size_t row) {
-            assert(columns->get(col)->get_type() == 'S');
-            return columns->get(col)->as_string()->get(row);
-        }
-
-
-        /**
-         * @brief Destroy the Data Frame object
-         *
-         */
-        ~DistDataFrame() override {
-            delete columns;
-            delete schema;
-        }
-
-        static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, bool *vals);
-
-        static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, float *vals);
-
-        static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, String **vals);
-
-        static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, int *vals);
-};
-
-class KDStore : public Object {
-    public:
-        int index;
-        Distributable* kvStore;
-
-
-        explicit KDStore(int idx) : Object() {
-            index = idx;
-            kvStore = new Distributable(index);
-        }
-
-        DistDataFrame *get(Key &key);
-
-        void put(Key &key, DataFrame *df);
-
-        DistDataFrame *waitAndGet(Key &key);
-};
-
-/**
- * Creates a distributed dataframe that contains the given values and stores it in the kv store
- * @param key - the key the df is being stored under
- * @param kvstore - the store it will be in
- * @param size - the number of values
- * @param vals - the values
- * @return
- */
-DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, int* vals) {
-    auto* col = new IntColumn();
-    for(size_t i = 0; i < size; i++) {
-        col->push_back(vals[i]);
-    }
-
-    Schema s{};
-    DataFrame df(s);
-    df.add_column(col, nullptr);
-
-    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
-
-    return newDf;
-}
-
-DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, float* vals) {
-    auto* col = new FloatColumn();
-    for(size_t i = 0; i < size; i++) {
-        col->push_back(vals[i]);
-    }
-
-    Schema s{};
-    DataFrame df(s);
-    df.add_column(col, nullptr);
-
-    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
-
-    return newDf;
-}
-
-/**
- * Creates a distributed dataframe that contains the given values and stores it in the kv store
- * @param key - the key the df is being stored under
- * @param kvstore - the store it will be in
- * @param size - the number of values
- * @param vals - the values
- * @return
- */
-DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, bool* vals) {
-    auto* col = new BoolColumn();
-    for(size_t i = 0; i < size; i++) {
-        col->push_back(vals[i]);
-    }
-
-    Schema s{};
-    DataFrame df(s);
-    df.add_column(col, nullptr);
-
-    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
-
-    return newDf;
-}
-
-/**
- * Creates a distributed dataframe that contains the given values and stores it in the kv store
- * @param key - the key the df is being stored under
- * @param kvstore - the store it will be in
- * @param size - the number of values
- * @param vals - the values
- * @return
- */
-DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, String** vals) {
-    auto* col = new StringColumn();
-    for(size_t i = 0; i < size; i++) {
-        col->push_back(vals[i]);
-    }
-
-    Schema s{};
-    DataFrame df(s);
-    df.add_column(col, nullptr);
-
-    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
-
-    return newDf;
-}
-
-/**
- * Get the DistDataframe associated with the key
- * @param key - the key for the DistDataframe
- * @return - DistDatafram associated with the key
- */
-DistDataFrame* KDStore::get(Key& key) {
-    return new DistDataFrame(key.key, kvStore);
-}
-
-/**
- * Construct a new DistDataframe from a Dataframe and store it in the nodes
- * @param key - the key associated with the new Dataframe
- * @param df - the Dataframe to base the new DistDataframe off of
- */
-void KDStore::put(Key& key, DataFrame* df) {
-    delete new DistDataFrame(*df, key.key, kvStore);
-}
-
-/**
- * Get the DistDataframe associated with the key when it exists
- * @param key - the key for the DistDataframe
- * @return - DistDatafram associated with the key
- */
-DistDataFrame* KDStore::waitAndGet(Key& key) {
-    while (true) {
-        DistDataFrame* df = get(key);
-        if (df) {
-            return df;
-        }
-    }
-}

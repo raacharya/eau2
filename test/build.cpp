@@ -1,10 +1,10 @@
-#include "serial.h"
-#include "schema.h"
-#include "dataframe.h"
+#include "../network/serial.h"
+#include "../dataframe/schema.h"
+#include "../dataframe/dataframe.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "parser.h"
+#include "../dataframe/parser.h"
 
 /**
  * Enum representing different states of parsing command line arguments.

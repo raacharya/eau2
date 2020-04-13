@@ -1,6 +1,6 @@
 #pragma once
 
-#include "efficientArray.h"
+#include "../array/efficientArray.h"
 #include "schema.h"
 #include "fielder.h"
 

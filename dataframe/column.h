@@ -1,8 +1,8 @@
 #pragma once
 #include <stdlib.h>
-#include "string.h"
+#include "../util/string.h"
 #include <stdarg.h>
-#include "efficientArray.h"
+#include "../array/efficientArray.h"
 
 
 class IntColumn;

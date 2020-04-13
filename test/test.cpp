@@ -1,15 +1,14 @@
-#include "serial.h"
-#include "schema.h"
-#include "dataframe.h"
+#include "../network/serial.h"
+#include "../dataframe/schema.h"
+#include "../dataframe/dataframe.h"
 #include "application.h"
 #include <stdio.h>
-#include "network_ip.h"
+#include "../network/network_ip.h"
 
 /**
  * Ensures that the serializer correctly serializes and deserializes a string array
  */
 void testStringArr() {
-    auto* serializer = new Serializer();
     Schema s("S");
     DataFrame df(s);
     Row r(df.get_schema());
@@ -22,11 +21,9 @@ void testStringArr() {
 
     char* serializedString = Serializer::serialize(arr);
 
-    EffStrArr* serializedArr = serializer->deserializeEffStrArr(serializedString);
+    EffStrArr* serializedArr = Serializer::deserializeEffStrArr(serializedString);
 
     assert(arr->equals(serializedArr));
-
-    delete serializer;
 
     std::cout << "works for string array" << "\n";
 }
@@ -35,7 +32,6 @@ void testStringArr() {
  * Ensures that the serializer correctly serializes and deserializes a float array
  */
 void testFloatArr() {
-    Serializer* serializer = new Serializer();
     Schema s("F");
     DataFrame df(s);
     Row r(df.get_schema());
@@ -46,13 +42,11 @@ void testFloatArr() {
 
     EffFloatArr* arr = df.columns->get(0)->as_float()->array;
 
-    char* serializedFloat = serializer->serialize(arr);
+    char* serializedFloat = Serializer::serialize(arr);
 
-    EffFloatArr* serializedArr = serializer->deserializeEffFloatArr(serializedFloat);
+    EffFloatArr* serializedArr = Serializer::deserializeEffFloatArr(serializedFloat);
 
     assert(arr->equals(serializedArr));
-
-    delete serializer;
 
     std::cout << "works for float array" << "\n";
 }
@@ -173,20 +167,18 @@ void testMessageSend() {
  * Ensures that the serializer correctly serializes and deserializes a message
  */
 void testMessageRegister() {
-
-    Serializer* serializer = new Serializer();
     size_t sender = 90;
     size_t id = 92;
     char* client = "192.0.2.33";
     size_t port = 8080;
 
-    Register* m = new Register(sender, port, client);
+    auto* m = new Register(sender, port, client);
     m->id_ = id;
 
     size_t size;
-    char* serializedMessage = serializer->serialize(m, size);
+    char* serializedMessage = Serializer::serialize(m, size);
 
-    Register* deserializedMessage = dynamic_cast<Register*>(serializer->deserializeMessage(serializedMessage));
+    auto* deserializedMessage = dynamic_cast<Register*>(Serializer::deserializeMessage(serializedMessage));
 
     assert(sender == deserializedMessage->sender_);
     assert(0 == deserializedMessage->target_);

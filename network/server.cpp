@@ -10,8 +10,8 @@
 #include <netdb.h>
 #include <poll.h>
 #include "network.h"
-#include "string.h"
-#include "efficientArray.h"
+#include "../util/string.h"
+#include "../array/efficientArray.h"
 #include "serial.h"
 
 #define PORT "9034"

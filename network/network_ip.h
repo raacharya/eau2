@@ -21,7 +21,7 @@ class NetworkIP : public NetworkIfc {
 
         int num_nodes = 5;
 
-        ~NetworkIP() { close(sock_); }
+        ~NetworkIP() override { close(sock_); }
 
         size_t index() override { return this_node_; }
 
@@ -76,14 +76,14 @@ class NetworkIP : public NetworkIfc {
             init_sock_(port);
             nodes_ = new NodeInfo[num_nodes];
             for (size_t i = 2; i <= num_nodes; i += 1) {
-                Register* msg = dynamic_cast<Register*>(recv_m());
+                auto* msg = dynamic_cast<Register*>(recv_m());
                 nodes_[msg->sender_].id = msg->sender_;
                 nodes_[msg->sender_].address.sin_family = AF_INET;
                 nodes_[msg->sender_].address.sin_port = htons(msg->port);
                 inet_aton(msg->client, &(nodes_[msg->sender_].address.sin_addr));
             }
-            size_t* ports = new size_t[num_nodes - 1];
-            String** addresses = new String*[num_nodes - 1];
+            auto* ports = new size_t[num_nodes - 1];
+            auto** addresses = new String*[num_nodes - 1];
             for (size_t i = 0; i < num_nodes - 1; i += 1) {
                 ports[i] = ntohs(nodes_[i + 1].address.sin_port);
                 addresses[i] = new String(inet_ntoa(nodes_[i + 1].address.sin_addr));
@@ -107,8 +107,8 @@ class NetworkIP : public NetworkIfc {
                 assert(false && "Invalid server IP address format");
             Register msg(idx, port, inet_ntoa(ip_.sin_addr));
             send_m(&msg);
-            Directory* ipd = dynamic_cast<Directory*>(recv_m());
-            NodeInfo* nodes = new NodeInfo[num_nodes];
+            auto* ipd = dynamic_cast<Directory*>(recv_m());
+            auto* nodes = new NodeInfo[num_nodes];
             for (size_t i = 0; i < ipd->clients; i += 1) {
                 nodes[i + 1].id = i + 1;
                 nodes[i + 1].address.sin_family = AF_INET;
@@ -135,7 +135,7 @@ class NetworkIP : public NetworkIfc {
         }
 
         Message* recv_m() override {
-            sockaddr_in sender;
+            sockaddr_in sender{};
             socklen_t addrlen = sizeof(sender);
             int req = accept(sock_, (sockaddr*)&sender, &addrlen);
             size_t size = 0;
