@@ -5,9 +5,9 @@
 #include "../util/object.h"
 #include "../array/efficientArray.h"
 #include "message.h"
-#include "msgKind.h"
 #include <stdlib.h>
 #include <sstream>
+#include <netinet/in.h>
 
 /**
  * Serializes different values of various data types. Makes the networking layer more efficient.
@@ -27,46 +27,42 @@ class Serializer: public Object {
          */
         ~Serializer() override = default;
 
+        static void putInBuffer(char* buffer, size_t& curIndex, unsigned char* bytes, size_t size) {
+            for (size_t i = 0; i < size; i += 1, curIndex += 1) {
+                buffer[curIndex] = bytes[i];
+            }
+        }
+
         static void serializeInBuffer(char* buffer, size_t& curIndex, int num) {
             auto *numChar = reinterpret_cast<unsigned char*>(&num);
-            for (size_t i = 0; i < sizeof(num); i += 1, curIndex += 1) {
-                buffer[curIndex] = numChar[i];
-            }
+            putInBuffer(buffer, curIndex, numChar, sizeof(num));
         }
 
         static void serializeInBuffer(char* buffer, size_t& curIndex, size_t num) {
             auto *numChar = reinterpret_cast<unsigned char*>(&num);
-            for (size_t i = 0; i < sizeof(num); i += 1, curIndex += 1) {
-                buffer[curIndex] = numChar[i];
-            }
+            putInBuffer(buffer, curIndex, numChar, sizeof(num));
         }
 
         static void serializeInBuffer(char* buffer, size_t& curIndex, float num) {
             auto *numChar = reinterpret_cast<unsigned char*>(&num);
-            for (size_t i = 0; i < sizeof(num); i += 1, curIndex += 1) {
-                buffer[curIndex] = numChar[i];
-            }
+            putInBuffer(buffer, curIndex, numChar, sizeof(num));
         }
 
         static void serializeInBuffer(char* buffer, size_t& curIndex, bool b) {
             auto *numChar = reinterpret_cast<unsigned char*>(&b);
-            for (size_t i = 0; i < sizeof(b); i += 1, curIndex += 1) {
-                buffer[curIndex] = numChar[i];
-            }
+            putInBuffer(buffer, curIndex, numChar, sizeof(b));
         }
 
         static void serializeInBuffer(char* buffer, size_t& curIndex, String* str) {
-            for (size_t i = 0; i < str->size(); i += 1, curIndex += 1) {
-                buffer[curIndex] = str->c_str()[i];
-            }
-            buffer[curIndex] = '\0';
-            curIndex += 1;
+            serializeInBuffer(buffer, curIndex, str->c_str());
         }
 
         static void serializeInBuffer(char* buffer, size_t& curIndex, char* str) {
             for (size_t i = 0; i < strlen(str); i += 1, curIndex += 1) {
                 buffer[curIndex] = str[i];
             }
+            buffer[curIndex] = '\0';
+            curIndex += 1;
         }
 
         /**
@@ -263,17 +259,15 @@ class Serializer: public Object {
 
         static char* serialize(Message* m, size_t& size) {
             char* buf = nullptr;
-            size_t curIndex = 0;
             if (m->kind_ == MsgKind::Directory) {
-                buf = serializeDirectory(dynamic_cast<Directory*>(m), curIndex);
+                buf = serializeDirectory(dynamic_cast<Directory*>(m), size);
             } else if (m->kind_ == MsgKind::Register) {
-                buf = serializeRegister(dynamic_cast<Register*>(m), curIndex);
+                buf = serializeRegister(dynamic_cast<Register*>(m), size);
             } else if (m->kind_ == MsgKind::Send) {
-                buf = serializeSend(dynamic_cast<Send*>(m), curIndex);
+                buf = serializeSend(dynamic_cast<Send*>(m), size);
             } else if (m->kind_ == MsgKind::Get) {
-                buf = serializeGet(dynamic_cast<Get*>(m), curIndex);
+                buf = serializeGet(dynamic_cast<Get*>(m), size);
             }
-            size += curIndex;
             return buf;
         }
 
@@ -281,7 +275,7 @@ class Serializer: public Object {
             char msgAbbr = 'R';
             size_t msgAttributesSize = 0;
             char* msgAttributes = serializeMsgAttributes(m, msgAttributesSize);
-            char* buffer = new char[1 + msgAttributesSize + sizeof(size_t) + strlen(m->client)];
+            char* buffer = new char[1 + msgAttributesSize + sizeof(size_t) + strlen(m->client) + 1];
             size_t curIndex = 0;
             buffer[curIndex] = 'R';
             curIndex += 1;
@@ -328,7 +322,7 @@ class Serializer: public Object {
             size_t msgAttributesSize = 0;
             char* msgAttributes = serializeMsgAttributes(m, msgAttributesSize);
             char type = m->type;
-            char* buffer = new char[1 + msgAttributesSize + 1 + strlen(m->key)];
+            char* buffer = new char[1 + msgAttributesSize + 1 + strlen(m->key) + 1];
             size_t curIndex = 0;
             buffer[curIndex] = 'G';
             curIndex += 1;
@@ -359,7 +353,7 @@ class Serializer: public Object {
             } else {
                 serializedChunk = serialize(s->c->fs, serializedChunkSize);
             }
-            char* buffer = new char[1 + msgAttributesSize + 1 + serializedChunkSize];
+            char* buffer = new char[1 + msgAttributesSize + 1 + strlen(s->key) + 1 + serializedChunkSize];
             size_t curIndex = 0;
             buffer[curIndex] = 'S';
             curIndex += 1;
@@ -369,6 +363,7 @@ class Serializer: public Object {
             delete[] msgAttributes;
             buffer[curIndex] = type;
             curIndex += 1;
+            serializeInBuffer(buffer, curIndex, s->key);
             for (size_t i = 0; i < serializedChunkSize; i += 1, curIndex += 1) {
                 buffer[curIndex] = serializedChunk[i];
             }
@@ -442,6 +437,7 @@ class Serializer: public Object {
             size_t id = deserializeSizeT(buffer, curIndex);
             char type = buffer[curIndex];
             curIndex += 1;
+            char* key = deserializeChar(buffer, curIndex);
             auto* chunk = new Chunk();
             if (type == 'I') {
                 FixedIntArray* arr = deserializeFixedIntArr(buffer, curIndex);
@@ -456,7 +452,7 @@ class Serializer: public Object {
                 FixedStrArray* arr = deserializeFixedStrArr(buffer, curIndex);
                 chunk->fs = arr;
             }
-            Send* send = new Send(chunk, type);
+            Send* send = new Send(chunk, type, key);
             send->sender_ = sender;
             send->target_ = target;
             send->id_ = id;
@@ -529,7 +525,7 @@ class Serializer: public Object {
             for (size_t i = curIndex; buffer[i] != '\0'; i += 1) {
                 strSize += 1;
             }
-            char* cpyChar = new char[strSize];
+            char* cpyChar = new char[strSize + 1];
             for (size_t i = 0; i <= strSize; i += 1, curIndex += 1) {
                 cpyChar[i] = buffer[curIndex];
             }

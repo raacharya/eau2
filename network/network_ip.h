@@ -4,15 +4,27 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "network_ifc.h"
+#include <netdb.h>
+#include "serial.h"
 
 class NodeInfo : public Object {
     public:
         unsigned id;
         sockaddr_in address;
+        int send = -1;
+        int recv = -1;
+
+        ~NodeInfo() {
+            if (send != -1) {
+                close(send);
+            }
+            if (recv != -1) {
+                close(recv);
+            }
+        }
 };
 
-class NetworkIP : public NetworkIfc {
+class NetworkIP : public Object {
     public:
         NodeInfo* nodes_;
         size_t this_node_;
@@ -21,16 +33,16 @@ class NetworkIP : public NetworkIfc {
 
         int num_nodes = 5;
 
-        ~NetworkIP() override { close(sock_); }
+        ~NetworkIP() override {
+            close(sock_);
+        }
 
-        size_t index() override { return this_node_; }
+        size_t index() { return this_node_; }
 
-        int init_sock_(size_t port) {
+        void init_sock_(size_t port) {
             int yes=1;
             int rv;
-
             struct addrinfo hints, *ai, *p;
-
             memset(&hints, 0, sizeof hints);
             hints.ai_family = AF_INET;
             hints.ai_socktype = SOCK_STREAM;
@@ -39,36 +51,22 @@ class NetworkIP : public NetworkIfc {
                 fprintf(stderr, "error getting address information: %s\n", gai_strerror(rv));
                 exit(1);
             }
-
             for(p = ai; p != NULL; p = p->ai_next) {
                 sock_ = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
                 if (sock_ < 0) {
                     continue;
                 }
-
                 setsockopt(sock_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-
                 if (::bind(sock_, p->ai_addr, p->ai_addrlen) < 0) {
                     close(sock_);
                     continue;
                 }
-
                 ip_ = *(struct sockaddr_in*)p->ai_addr;
-
                 break;
             }
-
-            if (p == NULL) {
-                return -1;
-            }
-
+            assert(p != NULL);
             freeaddrinfo(ai);
-
-            if (listen(sock_, 10) == -1) {
-                return -1;
-            }
-
-            return sock_;
+            assert(listen(sock_, 10) != -1);
         }
 
         void server_init(unsigned idx, size_t port) {
@@ -76,7 +74,7 @@ class NetworkIP : public NetworkIfc {
             init_sock_(port);
             nodes_ = new NodeInfo[num_nodes];
             for (size_t i = 2; i <= num_nodes; i += 1) {
-                auto* msg = dynamic_cast<Register*>(recv_m());
+                auto* msg = dynamic_cast<Register*>(recv_first_msg(false));
                 nodes_[msg->sender_].id = msg->sender_;
                 nodes_[msg->sender_].address.sin_family = AF_INET;
                 nodes_[msg->sender_].address.sin_port = htons(msg->port);
@@ -92,59 +90,119 @@ class NetworkIP : public NetworkIfc {
             Directory ipd(num_nodes - 1, ports,addresses);
             for (size_t i = 1; i < num_nodes; i += 1) {
                 ipd.target_ = i;
-                send_m(&ipd);
+                send_msg(&ipd, false);
             }
         }
 
-        void client_init(unsigned idx, size_t port, char* server_adr, unsigned server_port) {
+        void client_init(unsigned idx, size_t port, const char* server_adr, unsigned server_port) {
             this_node_ = idx;
             init_sock_(port);
-            nodes_ = new NodeInfo[1];
+            nodes_ = new NodeInfo[num_nodes];
             nodes_[0].id = 0;
             nodes_[0].address.sin_family = AF_INET;
             nodes_[0].address.sin_port = htons(server_port);
             if (inet_pton(AF_INET, server_adr, &nodes_[0].address.sin_addr) <= 0)
                 assert(false && "Invalid server IP address format");
             Register msg(idx, port, inet_ntoa(ip_.sin_addr));
-            send_m(&msg);
-            auto* ipd = dynamic_cast<Directory*>(recv_m());
-            auto* nodes = new NodeInfo[num_nodes];
+            send_msg(&msg, false);
+            Message* rec = recv_first_msg(false);
+            auto* ipd = dynamic_cast<Directory*>(rec);
             for (size_t i = 0; i < ipd->clients; i += 1) {
-                nodes[i + 1].id = i + 1;
-                nodes[i + 1].address.sin_family = AF_INET;
-                nodes[i + 1].address.sin_port = htons(ipd->ports[i]);
-                if (inet_pton(AF_INET, ipd->addresses[i]->c_str(), &nodes[i + 1].address.sin_addr) <= 0)
-                    assert(false);
+                nodes_[i + 1].id = i + 1;
+                nodes_[i + 1].address.sin_family = AF_INET;
+                nodes_[i + 1].address.sin_port = htons(ipd->ports[i]);
+                inet_aton(ipd->addresses[i]->c_str(), &nodes_[i + 1].address.sin_addr);
             }
-            delete[] nodes_;
-            nodes_ = nodes;
             delete ipd;
         }
 
-        void send_m(Message* msg) override {
+        void send_msg(Message* msg, bool keepAlive) {
             NodeInfo & tgt = nodes_[msg->target_];
-            int conn = socket(AF_INET, SOCK_STREAM, 0);
-            assert(conn >= 0 && "Unable to create client socket");
-            if (connect(conn, (sockaddr*)&tgt.address, sizeof(tgt.address)) < 0)
-                assert(false && "Unable to connect to remote node");
-            size_t size = 0;
-            char* buf = Serializer::serialize(msg, size);
-            send(conn, &size, sizeof(size_t), 0);
-            send(conn, buf, size, 0);
-            close(conn);
+            if (tgt.send == -1) {
+                tgt.send = socket(AF_INET, SOCK_STREAM, 0);
+                assert(tgt.send >= 0 && "Unable to create client socket");
+                if (connect(tgt.send, (sockaddr *) &tgt.address, sizeof(tgt.address)) < 0)
+                    assert(false && "Unable to connect to remote node");
+            }
+            send_msg_(msg, tgt.send);
+            if (!keepAlive) {
+                close(tgt.send);
+                tgt.send = -1;
+            }
         }
 
-        Message* recv_m() override {
+        void send_reply(Message* msg, bool keepAlive) {
+            NodeInfo & tgt = nodes_[msg->target_];
+            send_msg_(msg, tgt.recv);
+            if (!keepAlive) {
+                close(tgt.recv);
+                tgt.recv = -1;
+            }
+        }
+
+        void send_msg_(Message* msg, int& sock) {
+            assert(sock != -1);
+            size_t size = 0;
+            char* buf = Serializer::serialize(msg, size);
+            send(sock, &size, sizeof(size_t), 0);
+            send(sock, buf, size, 0);
+        }
+
+        Message* recv_first_msg(bool keepAlive) {
+            int req;
+            accept_connection(req);
+            return recv_msg(req, keepAlive);
+        }
+
+        Message* recv_msg(int& req, bool keepAlive) {
+            Message* msg = recv_message_(req);
+            NodeInfo & sender = nodes_[msg->sender_];
+            if (sender.recv != -1) {
+                close(sender.recv);
+                sender.recv = -1;
+            }
+            if (keepAlive) {
+                sender.recv = req;
+            } else {
+                close(req);
+            }
+            return msg;
+        }
+
+        Message* recv_msg(size_t index, bool keepAlive) {
+            NodeInfo & sender = nodes_[index];
+            Message* msg = recv_message_(sender.recv);
+            if (!keepAlive) {
+                close(sender.recv);
+                sender.recv = -1;
+            }
+            return msg;
+        }
+
+        Message* recv_reply(size_t index, bool keepAlive) {
+            NodeInfo & sender = nodes_[index];
+            Message* msg = recv_message_(sender.send);
+            if (!keepAlive) {
+                close(sender.send);
+                sender.send = -1;
+            }
+            return msg;
+        }
+
+        void accept_connection(int& req) {
             sockaddr_in sender{};
             socklen_t addrlen = sizeof(sender);
-            int req = accept(sock_, (sockaddr*)&sender, &addrlen);
+            req = accept(sock_, (sockaddr*)&sender, &addrlen);
+        }
+
+        Message* recv_message_(int& req) {
+            if (req == -1) assert(false && "no established connection");
             size_t size = 0;
             if (read(req, &size, sizeof(size_t)) == 0) assert(false && "failed to read");
             char* buf = new char[size];
             int rd = 0;
             while (rd != size) rd += read(req, buf + rd, size - rd);
             Message* msg = Serializer::deserializeMessage(buf);
-            close(req);
             return msg;
         }
 };

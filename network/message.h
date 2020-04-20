@@ -1,16 +1,7 @@
 #pragma once
 #include "../util/object.h"
 #include "msgKind.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <poll.h>
+#include "../array/array.h"
 
 class Message : public Object {
 
@@ -35,19 +26,9 @@ class Message : public Object {
             id_ = id;
         }
 
-        char* as_char() {
-
-        }
+        virtual ~Message() {}
 
 };
-
-class Ack : public Message {
-
-    public:
-
-
-};
-
 
 class Register : public Message {
     public:
@@ -64,7 +45,6 @@ class Register : public Message {
 };
 
 
-
 class Directory : public Message {
     public:
         size_t clients;
@@ -76,6 +56,14 @@ class Directory : public Message {
             ports = ports_;
             addresses = addresses_;
             kind_ = MsgKind::Directory;
+        }
+
+        ~Directory() {
+            delete[] ports;
+            for (size_t i = 0; i < clients; i += 1) {
+                delete addresses[i];
+            }
+            delete[] addresses;
         }
 };
 
@@ -107,10 +95,12 @@ class Send : public Message {
     public:
         Chunk* c;
         char type;
+        char* key;
 
-        Send(Chunk* c_, char type_) {
+        Send(Chunk* c_, char type_, char* key_) {
             c = c_;
             type = type_;
+            key = key_;
             kind_ = MsgKind::Send;
         }
 };

@@ -1135,7 +1135,7 @@ class DistFixedColArray : public Object {
          * Default constructor of this array.
          */
         DistFixedColArray(FixedColArray &from, String* id_var, Distributable* kvStore_var) : Object() {
-            id = id_var;
+            id = id_var->clone();
             kvStore = kvStore_var;
             used = from.array->used;
             capacity = from.array->capacity;
@@ -1150,7 +1150,7 @@ class DistFixedColArray : public Object {
                 String* col_id = id_var->clone();
                 col_id->concat("-");
                 col_id->concat(buf);
-                delete buf;
+                delete[] buf;
                 if (col->get_type() == 'I') {
                     DistIntColumn* copy = new DistIntColumn(*col->as_int(), col_id, kvStore);
                     array[i] = copy;
@@ -1164,6 +1164,7 @@ class DistFixedColArray : public Object {
                     DistStringColumn* copy = new DistStringColumn(*col->as_string(), col_id, kvStore);
                     array[i] = copy;
                 }
+                delete col_id;
             }
         }
 
@@ -1172,7 +1173,7 @@ class DistFixedColArray : public Object {
          * Default constructor of this array.
          */
         DistFixedColArray(DistEffCharArr* types, String* id_var, Distributable* kvStore_var) : Object() {
-            id = id_var;
+            id = id_var->clone();
             kvStore = kvStore_var;
             used = getSizeTFromKey("used");
             capacity = getSizeTFromKey("capacity");
@@ -1183,6 +1184,7 @@ class DistFixedColArray : public Object {
                 String* col_id = id_var->clone();
                 col_id->concat("-");
                 col_id->concat(buf);
+                delete[] buf;
                 if (types->get(i) == 'I') {
                     DistIntColumn* copy = new DistIntColumn(col_id, kvStore);
                     array[i] = copy;
@@ -1196,6 +1198,7 @@ class DistFixedColArray : public Object {
                     DistStringColumn* copy = new DistStringColumn(col_id, kvStore);
                     array[i] = copy;
                 }
+                delete col_id;
             }
         }
 
@@ -1272,7 +1275,13 @@ class DistFixedColArray : public Object {
         /**
          * Destructor of this class.
          */
-        ~DistFixedColArray() {}
+        ~DistFixedColArray() {
+            delete id;
+            for (size_t i = 0; i < used; i += 1) {
+                delete array[i];
+            }
+            delete[] array;
+        }
 };
 
 /*************************************************************************
@@ -1428,7 +1437,7 @@ class DistEffColArr : public Object {
          *
          */
         DistEffColArr(DistEffCharArr* types, String* id_var, Distributable* kvStore_var) {
-            id = id_var;
+            id = id_var->clone();
             kvStore = kvStore_var;
             chunkSize = getSizeTFromKey("chunkSize");
             capacity = getSizeTFromKey("capacity");
@@ -1441,7 +1450,9 @@ class DistEffColArr : public Object {
                 String* col_id = id_var->clone();
                 col_id->concat("-");
                 col_id->concat(buf);
+                delete[] buf;
                 array[i] = new DistFixedColArray(types, col_id, kvStore);
+                delete col_id;
             }
         }
 
@@ -1461,7 +1472,7 @@ class DistEffColArr : public Object {
          * @param from
          */
         DistEffColArr(EffColArr& from, String* id_var, Distributable* kvStore_var) {
-            id = id_var;
+            id = id_var->clone();
             kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
@@ -1478,8 +1489,9 @@ class DistEffColArr : public Object {
                 String* col_id = id_var->clone();
                 col_id->concat("-");
                 col_id->concat(buf);
-                delete buf;
+                delete[] buf;
                 array[i] = new DistFixedColArray(*from.chunks[i], col_id, kvStore);
+                delete col_id;
             }
         }
 
@@ -1538,5 +1550,10 @@ class DistEffColArr : public Object {
          *
          */
         ~DistEffColArr() {
+            delete id;
+            for (size_t i = 0; i < capacity; i += 1) {
+                delete array[i];
+            }
+            delete[] array;
         }
 };

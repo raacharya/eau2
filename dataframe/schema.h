@@ -118,7 +118,7 @@ class DistSchema : public Object {
     public:
 
         DistEffCharArr *types;
-        String* id;
+        String* id; // owned
         Distributable* kvStore;
 
         /** Copying constructor */
@@ -129,6 +129,7 @@ class DistSchema : public Object {
             String* types_id = id->clone();
             types_id->concat("-types");
             types = new DistEffCharArr(*from.types, types_id, kvStore);
+            delete types_id;
         }
 
         /** Create an empty schema **/
@@ -139,6 +140,7 @@ class DistSchema : public Object {
             String* types_id = id->clone();
             types_id->concat("-types");
             types = new DistEffCharArr(types_id, kvStore);
+            delete types_id;
         }
 
         /** Return type of column at idx. An idx >= width is undefined. */

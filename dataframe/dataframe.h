@@ -279,6 +279,7 @@ class DistDataFrame : public Object {
             String* cols_id = id->clone();
             cols_id->concat("-cols");
             columns = new DistEffColArr(schema->types, cols_id, kvStore);
+            delete cols_id;
         }
 
         DistDataFrame(DataFrame &from, String* id_var, Distributable* kvStore_var) {
@@ -289,6 +290,7 @@ class DistDataFrame : public Object {
             String* cols_id = id->clone();
             cols_id->concat("-cols");
             columns = new DistEffColArr(*from.columns, cols_id, kvStore);
+            delete cols_id;
         }
 
         /** Return the value at the given column and row. Accessing rows or
@@ -320,6 +322,7 @@ class DistDataFrame : public Object {
         ~DistDataFrame() override {
             delete columns;
             delete schema;
+            delete id;
         }
 
         static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, bool *vals);
@@ -333,11 +336,11 @@ class DistDataFrame : public Object {
 
 class KDStore : public Object {
     public:
-        int index;
+        size_t index;
         Distributable* kvStore;
 
 
-        explicit KDStore(int idx) : Object() {
+        explicit KDStore(size_t idx) : Object() {
             index = idx;
             kvStore = new Distributable(index);
         }
@@ -457,10 +460,5 @@ void KDStore::put(Key& key, DataFrame* df) {
  * @return - DistDatafram associated with the key
  */
 DistDataFrame* KDStore::waitAndGet(Key& key) {
-    while (true) {
-        DistDataFrame* df = get(key);
-        if (df) {
-            return df;
-        }
-    }
+    return new DistDataFrame(key.key, kvStore);
 }

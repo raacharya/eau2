@@ -93,7 +93,7 @@ class String : public Object {
             strcat(newCstr, csr);
             size_ = newSize - 1;
             newCstr[size_] = '\0';
-            delete cstr_;
+            delete[] cstr_;
             cstr_ = newCstr;
         }
 };

@@ -1,7 +1,6 @@
 #pragma once
 #include "../util/object.h"
 #include "../util/string.h"
-#include "../network/network.h"
 #include <cstring>
 #include <assert.h>
 #include <stdlib.h>
@@ -122,25 +121,6 @@ class FixedArray : public Object {
 			delete[] array;
 		}
 };
-
-class DistFixedArray : public Object  {
-    public:
-        String* id;
-        size_t used;
-        size_t capacity;
-        Distributable* kv_store;
-
-        DistFixedArray(FixedArray& from, String* id_var, Distributable* kvStore_var) : Object() {
-            id = id_var;
-            kv_store = kvStore_var;
-        }
-
-        DistFixedArray(String* id_var, Distributable* kvStore_var) : Object() {
-            id = id_var;
-            kv_store = kvStore_var;
-        }
-};
-
 
 /**
  * Represents an array of ints.
