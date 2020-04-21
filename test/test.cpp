@@ -194,12 +194,12 @@ void testNetwork() {
  * @return
  */
 int main(int argc, char** argv) {
-    testStringArr();
-    testFloatArr();
-    testMessageDirectory();
-    testMessageGet();
-    testMessageSend();
-    testMessageRegister();
+//    testStringArr();
+//    testFloatArr();
+//    testMessageDirectory();
+//    testMessageGet();
+//    testMessageSend();
+//    testMessageRegister();
 //    testNetwork();
     auto** kds = new KDStore*[5];
     for (size_t i = 0; i < 5; i += 1) {

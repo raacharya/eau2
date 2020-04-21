@@ -65,6 +65,12 @@ class Serializer: public Object {
             curIndex += 1;
         }
 
+        static char* serialize(size_t num, size_t size) {
+            char* buffer = new char[sizeof(num)];
+            serializeInBuffer(buffer, size, num);
+            return buffer;
+        }
+
         /**
          * Serialize this fixed int array
          * @param arr
@@ -277,7 +283,7 @@ class Serializer: public Object {
             char* msgAttributes = serializeMsgAttributes(m, msgAttributesSize);
             char* buffer = new char[1 + msgAttributesSize + sizeof(size_t) + strlen(m->client) + 1];
             size_t curIndex = 0;
-            buffer[curIndex] = 'R';
+            buffer[curIndex] = msgAbbr;
             curIndex += 1;
             for (size_t i = 0; i < msgAttributesSize; i += 1, curIndex += 1) {
                 buffer[curIndex] = msgAttributes[i];
@@ -300,7 +306,7 @@ class Serializer: public Object {
             char* buffer = new char[1 + msgAttributesSize + sizeof(size_t) +
                                     (m->clients * sizeof(size_t)) + addressesSize];
             size_t curIndex = 0;
-            buffer[curIndex] = 'D';
+            buffer[curIndex] = msgAbbr;
             curIndex += 1;
             for (size_t i = 0; i < msgAttributesSize; i += 1, curIndex += 1) {
                 buffer[curIndex] = msgAttributes[i];
@@ -322,9 +328,9 @@ class Serializer: public Object {
             size_t msgAttributesSize = 0;
             char* msgAttributes = serializeMsgAttributes(m, msgAttributesSize);
             char type = m->type;
-            char* buffer = new char[1 + msgAttributesSize + 1 + strlen(m->key) + 1];
+            char* buffer = new char[1 + msgAttributesSize + 1 + m->key->size() + 1];
             size_t curIndex = 0;
-            buffer[curIndex] = 'G';
+            buffer[curIndex] = msgAbbr;
             curIndex += 1;
             for (size_t i = 0; i < msgAttributesSize; i += 1, curIndex += 1) {
                 buffer[curIndex] = msgAttributes[i];
@@ -341,21 +347,23 @@ class Serializer: public Object {
             char msgAbbr = 'S';
             size_t msgAttributesSize = 0;
             char* msgAttributes = serializeMsgAttributes(s, msgAttributesSize);
-            char type = s->type;
+            char type = s->transfer->type;
             char* serializedChunk;
             size_t serializedChunkSize = 0;
-            if(type == 'I') {
-                serializedChunk = serialize(s->c->fi, serializedChunkSize);
+            if (type == 'T') {
+                serializedChunk = serialize(s->transfer->data->st, serializedChunkSize);
+            } else if (type == 'I') {
+                serializedChunk = serialize(s->transfer->data->fi, serializedChunkSize);
             } else if(type == 'F') {
-                serializedChunk = serialize(s->c->ff, serializedChunkSize);
+                serializedChunk = serialize(s->transfer->data->ff, serializedChunkSize);
             } else if(type == 'B') {
-                serializedChunk = serialize(s->c->fb, serializedChunkSize);
+                serializedChunk = serialize(s->transfer->data->fb, serializedChunkSize);
             } else {
-                serializedChunk = serialize(s->c->fs, serializedChunkSize);
+                serializedChunk = serialize(s->transfer->data->fs, serializedChunkSize);
             }
-            char* buffer = new char[1 + msgAttributesSize + 1 + strlen(s->key) + 1 + serializedChunkSize];
+            char* buffer = new char[1 + msgAttributesSize + 1 + s->key->size() + 1 + serializedChunkSize];
             size_t curIndex = 0;
-            buffer[curIndex] = 'S';
+            buffer[curIndex] = msgAbbr;
             curIndex += 1;
             for (size_t i = 0; i < msgAttributesSize; i += 1, curIndex += 1) {
                 buffer[curIndex] = msgAttributes[i];
@@ -438,21 +446,20 @@ class Serializer: public Object {
             char type = buffer[curIndex];
             curIndex += 1;
             char* key = deserializeChar(buffer, curIndex);
-            auto* chunk = new Chunk();
+            Send* send;
             if (type == 'I') {
                 FixedIntArray* arr = deserializeFixedIntArr(buffer, curIndex);
-                chunk->fi = arr;
+                send = new Send(arr, key);
             } else if (type == 'F') {
                 FixedFloatArray* arr = deserializeFixedFloatArr(buffer, curIndex);
-                chunk->ff = arr;
+                send = new Send(arr, key);
             } else if (type == 'B') {
                 FixedBoolArray* arr = deserializeFixedBoolArr(buffer, curIndex);
-                chunk->fb = arr;
+                send = new Send(arr, key);
             } else {
                 FixedStrArray* arr = deserializeFixedStrArr(buffer, curIndex);
-                chunk->fs = arr;
+                send = new Send(arr, key);
             }
-            Send* send = new Send(chunk, type, key);
             send->sender_ = sender;
             send->target_ = target;
             send->id_ = id;

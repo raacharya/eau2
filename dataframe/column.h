@@ -30,16 +30,16 @@ class Column : public Object {
     /** Type converters: Return same column under its actual type, or
      *  nullptr if of the wrong type.  */
     virtual IntColumn* as_int() {
-
+        assert(false);
     }
     virtual BoolColumn*  as_bool() {
-
+        assert(false);
     }
     virtual FloatColumn* as_float() {
-
+        assert(false);
     }
     virtual StringColumn* as_string() {
-
+        assert(false);
     }
 
     /** Type appropriate push_back methods. Calling the wrong method is
@@ -59,7 +59,7 @@ class Column : public Object {
 
     /** Returns the number of elements in the column. */
     virtual size_t size() {
-
+        assert(false);
     }
 
     /** Return the type of this column as a char: 'S', 'B', 'I' and 'F'.*/
@@ -85,21 +85,21 @@ class DistColumn : public Object {
         /** Type converters: Return same column under its actual type, or
          *  nullptr if of the wrong type.  */
         virtual DistIntColumn* as_int() {
-
+            assert(false);
         }
         virtual DistBoolColumn*  as_bool() {
-
+            assert(false);
         }
         virtual DistFloatColumn* as_float() {
-
+            assert(false);
         }
         virtual DistStringColumn* as_string() {
-
+            assert(false);
         }
 
         /** Returns the number of elements in the column. */
         virtual size_t size() {
-
+            assert(false);
         }
 
         /** Return the type of this column as a char: 'S', 'B', 'I' and 'F'.*/
@@ -128,22 +128,6 @@ class IntColumn : public Column {
         IntColumn() {
             array = new EffIntArr();
             type = 'I';
-        }
-
-        /**
-         * @brief Construct a new Int Column object from a variable # of args
-         * 
-         * @param n - the number of args
-         * @param ... 
-         */
-        IntColumn(int n, ...) {
-            array = new EffIntArr();
-            va_list argp;
-            va_start(argp, n);
-            for(size_t i = 0; i < n; i++) {
-                array->pushBack(va_arg(argp, int));
-            }
-            va_end(argp);
         }
 
         /**
@@ -348,22 +332,6 @@ class BoolColumn : public Column {
         BoolColumn() {
             array = new EffBoolArr();
             type = 'B';
-        }
-
-        /**
-         * @brief Construct a new Bool Column object from a variable number of arguments
-         * 
-         * @param - number of args
-         * @param ... 
-         */
-        BoolColumn(int n, ...) {
-            array = new EffBoolArr();
-            va_list argp;
-            va_start(argp, n);
-            for(size_t i = 0; i < n; i++) {
-                array->pushBack(va_arg(argp, bool));
-            }
-            va_end(argp);
         }
 
         /**
@@ -572,22 +540,6 @@ class FloatColumn : public Column {
         }
 
         /**
-         * @brief Construct a new Float Column object from a variable number of floats
-         * 
-         * @param n - the  number of args
-         * @param ... 
-         */
-        FloatColumn(int n, ...) {
-            array = new EffFloatArr();
-            va_list argp;
-            va_start(argp, n);
-            for(size_t i = 0; i < n; i++) {
-                array->pushBack(va_arg(argp, float));
-            }
-            va_end(argp);
-        }
-
-        /**
          * @brief Construct a new Float Column object
          * 
          * @param from 
@@ -783,24 +735,6 @@ class StringColumn : public Column {
         StringColumn() {
             array = new EffStrArr();
             type = 'S';
-        }
-
-        /**
-         * @brief Construct a new String Column object from a variable number of strings
-         * 
-         * @param n 
-         * @param ... 
-         */
-        StringColumn(int n, ...) {
-            array = new EffStrArr();
-            va_list argp;
-            va_start(argp, n);
-            for(size_t i = 0; i < n; i++) {
-              char* str = va_arg(argp, char*);
-              size_t len = strlen(str);
-              array->pushBack(new String(true, str, len));
-            }
-            va_end(argp);
         }
 
         /**
@@ -1096,16 +1030,6 @@ class FixedColArray : public Object {
           return array->used;
         }
 
-        /**
-         * @brief get the index of item in this array
-         * 
-         * @param item 
-         * @return int 
-         */
-		int indexOf(Column* item) {
-			return array->indexOf(item);
-		}
-
 
 		/**
 		 * Destructor of this class.
@@ -1140,8 +1064,8 @@ class DistFixedColArray : public Object {
             used = from.array->used;
             capacity = from.array->capacity;
 
-            kvStore->sendToNode(createKey("used"), createValue(used));
-            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
+            kvStore->sendToNode(createKey(id, "used", 0), createValue(used));
+            kvStore->sendToNode(createKey(id, "capacity", 0), createValue(capacity));
             array = new DistColumn*[capacity];
             for (size_t i = 0; i < used; i += 1) {
                 Column* col = from.get(i);
@@ -1175,8 +1099,8 @@ class DistFixedColArray : public Object {
         DistFixedColArray(DistEffCharArr* types, String* id_var, Distributable* kvStore_var) : Object() {
             id = id_var->clone();
             kvStore = kvStore_var;
-            used = getSizeTFromKey("used");
-            capacity = getSizeTFromKey("capacity");
+            used = kvStore->getSizeT(createKey(id, "used", 0));
+            capacity = kvStore->getSizeT(createKey(id, "capacity", 0));
             array = new DistColumn*[capacity];
             for (size_t i = 0; i < used; i += 1) {
                 char* buf = new char[length(i) + 1];
@@ -1202,16 +1126,6 @@ class DistFixedColArray : public Object {
             }
         }
 
-        size_t getSizeTFromKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            Key* sizeTKey = new Key(idClone, 0);
-            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
-            delete sizeTKey;
-            return toReturn;
-        }
-
         size_t length(size_t s) {
             size_t len = 1;
             s = s / 10;
@@ -1220,25 +1134,6 @@ class DistFixedColArray : public Object {
                 len += 1;
             }
             return len;
-        }
-
-        Key* createKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            return new Key(idClone, 0);
-        }
-
-        Value* createValue(size_t s) {
-            Value* val = new Value;
-            val->st = s;
-            return val;
-        }
-
-        Value* createValue(DistColumn* distColumn) {
-            Value* val = new Value;
-            val->obj = distColumn;
-            return val;
         }
 
 
@@ -1387,22 +1282,6 @@ class EffColArr : public Object {
          */
         size_t size() {
             return numberOfElements;
-        }  
-
-        /**
-         * @brief get the index of the item in this col array
-         * 
-         * @param item 
-         * @return int 
-         */
-        int indexOf(Column* item) {
-            for (int i = 0; i <= currentChunkIdx; i += 1) {
-                int indexOf = chunks[i]->indexOf(item);
-                if (indexOf != -1) {
-                    return indexOf;
-                }
-            }
-            return -1;
         }
 
         /**
@@ -1439,10 +1318,10 @@ class DistEffColArr : public Object {
         DistEffColArr(DistEffCharArr* types, String* id_var, Distributable* kvStore_var) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = getSizeTFromKey("chunkSize");
-            capacity = getSizeTFromKey("capacity");
-            currentChunkIdx = getSizeTFromKey("currentChunk");
-            numberOfElements = getSizeTFromKey("numElements");
+            chunkSize = kvStore->getSizeT(createKey(id, "chunkSize", 0));
+            capacity = kvStore->getSizeT(createKey(id, "capacity", 0));
+            currentChunkIdx = kvStore->getSizeT(createKey(id, "currentChunk", 0));
+            numberOfElements = kvStore->getSizeT(createKey(id, "numElements", 0));
             array = new DistFixedColArray*[capacity];
             for (size_t i = 0; i < capacity; i += 1) {
                 char* buf = new char[length(i) + 1];
@@ -1454,16 +1333,6 @@ class DistEffColArr : public Object {
                 array[i] = new DistFixedColArray(types, col_id, kvStore);
                 delete col_id;
             }
-        }
-
-        size_t getSizeTFromKey(const char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            Key* sizeTKey = new Key(idClone, 0);
-            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
-            delete sizeTKey;
-            return toReturn;
         }
 
         /**
@@ -1479,10 +1348,10 @@ class DistEffColArr : public Object {
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
             array = new DistFixedColArray*[capacity];
-            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
-            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
-            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
-            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            kvStore->sendToNode(createKey(id, "chunkSize", 0), createValue(chunkSize));
+            kvStore->sendToNode(createKey(id, "capacity", 0), createValue(capacity));
+            kvStore->sendToNode(createKey(id, "currentChunk", 0), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey(id, "numElements", 0), createValue(numberOfElements));
             for (size_t i = 0; i < capacity; i += 1) {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
@@ -1503,25 +1372,6 @@ class DistEffColArr : public Object {
                 len += 1;
             }
             return len;
-        }
-
-        Key* createKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            return new Key(idClone, 0);
-        }
-
-        Value* createValue(size_t s) {
-            Value* val = new Value;
-            val->st = s;
-            return val;
-        }
-
-        Value* createValue(FixedColArray* fixedStrArray) {
-            Value* val = new Value;
-            val->obj = fixedStrArray;
-            return val;
         }
 
         /**

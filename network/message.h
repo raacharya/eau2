@@ -69,13 +69,17 @@ class Directory : public Message {
 
 class Get : public Message {
     public:
-        char type; // one of 'I', 'F', 'B', 'S'
-        char* key;
+        char type; // one of 'I', 'F', 'B', 'S', 'T'
+        String* key;
 
         Get(char type_, char* key_) {
             type = type_;
-            key = key_;
+            key = new String(key_);
             kind_ = MsgKind::Get;
+        }
+
+        ~Get() {
+            delete key;
         }
 };
 
@@ -84,23 +88,107 @@ class Get : public Message {
  *
  */
 
-union Chunk  {
+union Data {
+    size_t st;
     FixedIntArray* fi;
     FixedFloatArray* ff;
     FixedBoolArray* fb;
     FixedStrArray* fs;
 };
 
+class Transfer : public Object {
+    public:
+        Data* data;
+        char type;
+
+        Transfer(size_t var) {
+            type = 'T';
+            data = new Data();
+            data->st = var;
+        }
+
+        Transfer(FixedIntArray* var) {
+            type = 'I';
+            data = new Data();
+            data->fi = var;
+        }
+
+        Transfer(FixedFloatArray* var) {
+            type = 'F';
+            data = new Data();
+            data->ff = var;
+        }
+
+        Transfer(FixedBoolArray* var) {
+            type = 'B';
+            data = new Data();
+            data->fb = var;
+        }
+
+        Transfer(FixedStrArray* var) {
+            type = 'S';
+            data = new Data();
+            data->fs = var;
+        }
+
+        ~Transfer() {
+            if (type == 'I') {
+                delete data->fi;
+            } else if (type == 'F') {
+                delete data->ff;
+            } else if (type == 'B') {
+                delete data->fb;
+            } else if (type == 'S') {
+                delete data->fs;
+            }
+            delete data;
+        }
+};
+
 class Send : public Message {
     public:
-        Chunk* c;
-        char type;
-        char* key;
+        Transfer* transfer;
+        String* key;
 
-        Send(Chunk* c_, char type_, char* key_) {
-            c = c_;
-            type = type_;
-            key = key_;
+        Send(size_t var, const char* key_) {
             kind_ = MsgKind::Send;
+            key = new String(key_);
+            transfer = new Transfer(var);
+        }
+
+        Send(FixedIntArray* var, const char* key_) {
+            kind_ = MsgKind::Send;
+            key = new String(key_);
+            transfer = new Transfer(var);
+        }
+
+        Send(FixedBoolArray* var, const char* key_) {
+            kind_ = MsgKind::Send;
+            key = new String(key_);
+            transfer = new Transfer(var);
+        }
+
+        Send(FixedFloatArray* var, const char* key_) {
+            kind_ = MsgKind::Send;
+            key = new String(key_);
+            transfer = new Transfer(var);
+        }
+
+        Send(FixedStrArray* var, const char* key_) {
+            kind_ = MsgKind::Send;
+            key = new String(key_);
+            transfer = new Transfer(var);
+        }
+
+        void delete_transfer() {
+            delete transfer;
+        }
+
+        ~Send() {
+            delete key;
+        }
+
+        char type() {
+            return transfer->type;
         }
 };

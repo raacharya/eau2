@@ -150,6 +150,7 @@ class DistSchema : public Object {
         }
 
         ~DistSchema() {
+            delete id;
             delete types;
         }
 };

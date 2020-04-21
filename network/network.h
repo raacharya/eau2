@@ -1,6 +1,7 @@
 #pragma once
 
 #include <thread>
+#include <condition_variable>
 #include <mutex>
 #include <map>
 #include "network_ip.h"
@@ -36,14 +37,28 @@ class Key : public Object {
         };
 };
 
-union Value {
-    size_t st;
-    Object* obj;
-};
+Key* createKey(String* prefix, const char* suffix, size_t node) {
+    String* idClone = prefix->clone();
+    idClone->concat("-");
+    idClone->concat(suffix);
+    return new Key(idClone, node);
+}
+
+Value* createValue(size_t s) {
+    Value* val = new Value;
+    val->st = s;
+    return val;
+}
+
+Value* createValue(Object* o) {
+    Value* val = new Value;
+    val->obj = o;
+    return val;
+}
 
 class Distributable : public Object {
     public:
-        std::map<std::string, Value*> kvStore;
+        std::map<std::string, Transfer*> kvStore;
         size_t index;
         NetworkIP* network;
         std::thread* pid;
@@ -51,23 +66,28 @@ class Distributable : public Object {
         std::thread** pids;
         size_t pid_index;
         std::mutex mtx;
+        std::condition_variable cv;
+        bool ready = false;
 
         Distributable(size_t index_var) {
             index = index_var;
             network = new NetworkIP();
             pid = new std::thread(&Distributable::start, this);
             pid2 = new std::thread(&Distributable::startAndReceive, this);
-            pid2->detach();
             pids = new std::thread*[5];
             pid_index = 0;
         }
 
         void start() {
+            std::unique_lock<std::mutex> lck(mtx);
             if (index == 0) {
                 network->server_init(index, 9000);
             } else {
                 network->client_init(index, 9000 + index, "127.0.0.1", 9000);
             }
+            ready = true;
+            lck.unlock();
+            cv.notify_all();
         }
 
         void listen(int* sock) {
@@ -77,18 +97,21 @@ class Distributable : public Object {
                 mtx.lock();
                 if (msg->kind_ == MsgKind::Get) {
                     Get* get = dynamic_cast<Get*>(msg);
-                    Value* val = kvStore.find(std::string(get->key))->second;
-                    Chunk* chunk = new Chunk();
-                    if (get->type == 'I') {
-                        chunk->fi = dynamic_cast<FixedIntArray*>(val->obj);
+                    assert(kvStore.find(get->key->c_str()) != kvStore.end());
+                    Transfer* val = kvStore.find(std::string(get->key->c_str()))->second;
+                    assert(get->type == val->type);
+                    Send* send;
+                    if (get->type == 'T') {
+                        send = new Send(val->data->st, get->key->c_str());
+                    } else if (get->type == 'I') {
+                        send = new Send(val->data->fi, get->key->c_str());
                     } else if (get->type == 'F') {
-                        chunk->ff = dynamic_cast<FixedFloatArray*>(val->obj);
+                        send = new Send(val->data->ff, get->key->c_str());
                     } else if (get->type == 'B') {
-                        chunk->fb = dynamic_cast<FixedBoolArray*>(val->obj);
+                        send = new Send(val->data->fb, get->key->c_str());
                     } else {
-                        chunk->fs = dynamic_cast<FixedStrArray*>(val->obj);
+                        send = new Send(val->data->fs, get->key->c_str());
                     }
-                    Send* send = new Send(chunk, get->type, get->key);
                     send->target_ = get->sender_;
                     send->sender_ = get->target_;
                     send->id_ = get->id_;
@@ -97,27 +120,17 @@ class Distributable : public Object {
                     delete send;
                 } else if (msg->kind_ == MsgKind::Send) {
                     Send* send = dynamic_cast<Send*>(msg);
-                    Value* val = new Value();
-                    if (send->type == 'I') {
-                        val->obj = send->c->fi;
-                    } else if (send->type == 'F') {
-                        val->obj = send->c->ff;
-                    } else if (send->type == 'B') {
-                        val->obj = send->c->fb;
-                    } else {
-                        val->obj = send->c->fs;
-                    }
-                    kvStore[std::string(send->key)] = val;
+                    kvStore[std::string(send->key->c_str())] = send->transfer;
+                    delete send;
                 }
                 mtx.unlock();
             } while ((msg = network->recv_msg(sender, true)));
         }
 
         void startAndReceive() {
-            mtx.lock();
-            pid->join();
-            delete pid;
-            mtx.unlock();
+            std::unique_lock<std::mutex> lck(mtx);
+            while (!ready) cv.wait(lck);
+            lck.unlock();
             for (;;) {
                 int sock;
                 network->accept_connection(sock);
@@ -127,7 +140,9 @@ class Distributable : public Object {
         }
 
         void sendToNode(Key* key, Value* value) {
-            mtx.lock();
+            std::unique_lock<std::mutex> lck(mtx);
+            while (!ready) cv.wait(lck);
+            lck.unlock();
             if (key->node == index) {
                 kvStore[std::string(key->key->c_str())] = value;
             } else {
@@ -141,12 +156,24 @@ class Distributable : public Object {
                 network->send_msg(send, true);
                 delete send;
             }
-            mtx.unlock();
+            delete key;
+        }
+        
+        size_t getSizeT(Key* key) {
+            size_t s = 0;
+            if (kvStore.find(key->key->c_str()) != kvStore.end()) {
+                s = kvStore.find(std::string(key->key->c_str()))->second->st;
+            }
+            delete key;
+            return s;
         }
 
+
+
         Value* getFromNode(Key* key) {
+            Value* val;
             if (kvStore.find(key->key->c_str()) != kvStore.end()) {
-                return kvStore.find(std::string(key->key->c_str()))->second;
+                 val = kvStore.find(std::string(key->key->c_str()))->second;
             } else {
                 Get* get = new Get('F', key->key->c_str());
                 get->sender_ = index;
@@ -155,7 +182,7 @@ class Distributable : public Object {
                 delete get;
                 Message* msg = network->recv_reply(key->node, true);
                 Send* send = dynamic_cast<Send*>(msg);
-                Value* val = new Value();
+                val = new Value();
                 if (send->type == 'I') {
                     val->obj = send->c->fi;
                 } else if (send->type == 'F') {
@@ -166,11 +193,17 @@ class Distributable : public Object {
                     val->obj = send->c->fs;
                 }
                 kvStore[std::string(send->key)] = val;
-                return val;
             }
+            delete key;
+            return val;
         }
 
         ~Distributable() {
+            for (std::map<std::string, Value*>::iterator itr = kvStore.begin(); itr != kvStore.end(); itr++) {
+                delete (itr->second);
+            }
+            delete network;
+            delete pid;
             delete pid2;
             for (size_t i = 0; i < 5; i += 1) {
                 if (pids[i] != nullptr) {
@@ -179,7 +212,6 @@ class Distributable : public Object {
                 }
             }
             delete[] pids;
-            delete network;
         }
 };
 
@@ -203,20 +235,10 @@ class DistEffIntArr : public Object {
         DistEffIntArr(String* id_var, Distributable* kvStore_var) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = getSizeTFromKey("chunkSize");
-            capacity = getSizeTFromKey("capacity");
-            currentChunkIdx = getSizeTFromKey("currentChunk");
-            numberOfElements = getSizeTFromKey("numElements");
-        }
-
-        size_t getSizeTFromKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            Key* sizeTKey = new Key(idClone, 0);
-            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
-            delete sizeTKey;
-            return toReturn;
+            chunkSize = kvStore->getSizeT(createKey(id, "chunkSize", 0));
+            capacity = kvStore->getSizeT(createKey(id, "capacity", 0));
+            currentChunkIdx = kvStore->getSizeT(createKey(id, "currentChunk", 0));
+            numberOfElements = kvStore->getSizeT(createKey(id, "numElements", 0));
         }
 
         /**
@@ -233,14 +255,14 @@ class DistEffIntArr : public Object {
             numberOfElements = from.numberOfElements;
 
 
-            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
-            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
-            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
-            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            kvStore->sendToNode(createKey(id, "chunkSize", 0), createValue(chunkSize));
+            kvStore->sendToNode(createKey(id, "capacity", 0), createValue(capacity));
+            kvStore->sendToNode(createKey(id, "currentChunk", 0), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey(id, "numElements", 0), createValue(numberOfElements));
             for (size_t i = 0; i < capacity; i += 1) {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
-                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
+                kvStore->sendToNode(createKey(id, buf, i % 5), createValue(from.chunks[i]->clone()));
                 delete[] buf;
             }
         }
@@ -255,25 +277,6 @@ class DistEffIntArr : public Object {
             return len;
         }
 
-        Key* createKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            return new Key(idClone, 0);
-        }
-
-        Value* createValue(size_t s) {
-            auto* val = new Value;
-            val->st = s;
-            return val;
-        }
-
-        Value* createValue(FixedIntArray* fixedIntArray) {
-            auto* val = new Value;
-            val->obj = fixedIntArray;
-            return val;
-        }
-
         /**
          * @brief Get the column at the given index
          *
@@ -284,7 +287,7 @@ class DistEffIntArr : public Object {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
             sprintf(buf, "%zu", chunkIdx);
-            Value* val = kvStore->getFromNode(createKey(buf));
+            Value* val = kvStore->getFromNode(createKey(id, buf, chunkIdx % 5));
             Object* obj = val->obj;
             FixedIntArray* curChunk = dynamic_cast<FixedIntArray*>(obj);
             return curChunk->get(idx % chunkSize);
@@ -328,20 +331,10 @@ class DistEffFloatArr : public Object {
         DistEffFloatArr(String* id_var, Distributable* kvStore_var) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = getSizeTFromKey("chunkSize");
-            capacity = getSizeTFromKey("capacity");
-            currentChunkIdx = getSizeTFromKey("currentChunk");
-            numberOfElements = getSizeTFromKey("numElements");
-        }
-
-        size_t getSizeTFromKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            Key* sizeTKey = new Key(idClone, 0);
-            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
-            delete sizeTKey;
-            return toReturn;
+            chunkSize = kvStore->getSizeT(createKey(id, "chunkSize", 0));
+            capacity = kvStore->getSizeT(createKey(id, "capacity", 0));
+            currentChunkIdx = kvStore->getSizeT(createKey(id, "currentChunk", 0));
+            numberOfElements = kvStore->getSizeT(createKey(id, "numElements", 0));
         }
 
         /**
@@ -358,14 +351,14 @@ class DistEffFloatArr : public Object {
             numberOfElements = from.numberOfElements;
 
 
-            kvStore->sendToNode(createKey("chunkSize", 0), createValue(chunkSize));
-            kvStore->sendToNode(createKey("capacity", 0), createValue(capacity));
-            kvStore->sendToNode(createKey("currentChunk", 0), createValue(currentChunkIdx));
-            kvStore->sendToNode(createKey("numElements", 0), createValue(numberOfElements));
+            kvStore->sendToNode(createKey(id, "chunkSize", 0), createValue(chunkSize));
+            kvStore->sendToNode(createKey(id, "capacity", 0), createValue(capacity));
+            kvStore->sendToNode(createKey(id, "currentChunk", 0), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey(id, "numElements", 0), createValue(numberOfElements));
             for (size_t i = 0; i < capacity; i += 1) {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
-                kvStore->sendToNode(createKey(buf, (i % 5)), createValue(from.chunks[i]->clone()));
+                kvStore->sendToNode(createKey(id, buf, (i % 5)), createValue(from.chunks[i]->clone()));
                 delete[] buf;
             }
         }
@@ -380,25 +373,6 @@ class DistEffFloatArr : public Object {
             return len;
         }
 
-        Key* createKey(char* suffix, size_t node) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            return new Key(idClone, node);
-        }
-
-        Value* createValue(size_t s) {
-            Value* val = new Value;
-            val->st = s;
-            return val;
-        }
-
-        Value* createValue(FixedFloatArray* fixedArray) {
-            Value* val = new Value;
-            val->obj = fixedArray;
-            return val;
-        }
-
         /**
          * @brief Get the column at the given index
          *
@@ -409,7 +383,7 @@ class DistEffFloatArr : public Object {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
             sprintf(buf, "%zu", chunkIdx);
-            Value* val = kvStore->getFromNode(createKey(buf, (chunkIdx % 5)));
+            Value* val = kvStore->getFromNode(createKey(id, buf, (chunkIdx % 5)));
             Object* obj = val->obj;
             delete[] buf;
             FixedFloatArray* curChunk = dynamic_cast<FixedFloatArray*>(obj);
@@ -454,20 +428,10 @@ class DistEffBoolArr : public Object {
         DistEffBoolArr(String* id_var, Distributable* kvStore_var) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = getSizeTFromKey("chunkSize");
-            capacity = getSizeTFromKey("capacity");
-            currentChunkIdx = getSizeTFromKey("currentChunk");
-            numberOfElements = getSizeTFromKey("numElements");
-        }
-
-        size_t getSizeTFromKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            Key* sizeTKey = new Key(idClone, 0);
-            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
-            delete sizeTKey;
-            return toReturn;
+            chunkSize = kvStore->getSizeT(createKey(id, "chunkSize", 0));
+            capacity = kvStore->getSizeT(createKey(id, "capacity", 0));
+            currentChunkIdx = kvStore->getSizeT(createKey(id, "currentChunk", 0));
+            numberOfElements = kvStore->getSizeT(createKey(id, "numElements", 0));
         }
 
         /**
@@ -484,14 +448,14 @@ class DistEffBoolArr : public Object {
             numberOfElements = from.numberOfElements;
 
 
-            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
-            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
-            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
-            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            kvStore->sendToNode(createKey(id, "chunkSize", 0), createValue(chunkSize));
+            kvStore->sendToNode(createKey(id, "capacity", 0), createValue(capacity));
+            kvStore->sendToNode(createKey(id, "currentChunk", 0), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey(id, "numElements", 0), createValue(numberOfElements));
             for (size_t i = 0; i < capacity; i += 1) {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
-                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
+                kvStore->sendToNode(createKey(id, buf, i % 5), createValue(from.chunks[i]->clone()));
                 delete[] buf;
             }
         }
@@ -506,25 +470,6 @@ class DistEffBoolArr : public Object {
             return len;
         }
 
-        Key* createKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            return new Key(idClone, 0);
-        }
-
-        Value* createValue(size_t s) {
-            Value* val = new Value;
-            val->st = s;
-            return val;
-        }
-
-        Value* createValue(FixedBoolArray* fixedArray) {
-            Value* val = new Value;
-            val->obj = fixedArray;
-            return val;
-        }
-
         /**
          * @brief Get the column at the given index
          *
@@ -535,7 +480,7 @@ class DistEffBoolArr : public Object {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
             sprintf(buf, "%zu", chunkIdx);
-            Value* val = kvStore->getFromNode(createKey(buf));
+            Value* val = kvStore->getFromNode(createKey(id, buf, chunkIdx % 5));
             delete[] buf;
             Object* obj = val->obj;
             FixedBoolArray* curChunk = dynamic_cast<FixedBoolArray*>(obj);
@@ -580,20 +525,10 @@ class DistEffCharArr : public Object {
         DistEffCharArr(String* id_var, Distributable* kvStore_var) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = getSizeTFromKey("chunkSize");
-            capacity = getSizeTFromKey("capacity");
-            currentChunkIdx = getSizeTFromKey("currentChunk");
-            numberOfElements = getSizeTFromKey("numElements");
-        }
-
-        size_t getSizeTFromKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            Key* sizeTKey = new Key(idClone, 0);
-            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
-            delete sizeTKey;
-            return toReturn;
+            chunkSize = kvStore->getSizeT(createKey(id, "chunkSize", 0));
+            capacity = kvStore->getSizeT(createKey(id, "capacity", 0));
+            currentChunkIdx = kvStore->getSizeT(createKey(id, "currentChunk", 0));
+            numberOfElements = kvStore->getSizeT(createKey(id, "numElements", 0));
         }
 
         /**
@@ -610,14 +545,14 @@ class DistEffCharArr : public Object {
             numberOfElements = from.numberOfElements;
 
 
-            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
-            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
-            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
-            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            kvStore->sendToNode(createKey(id, "chunkSize", 0), createValue(chunkSize));
+            kvStore->sendToNode(createKey(id, "capacity", 0), createValue(capacity));
+            kvStore->sendToNode(createKey(id, "currentChunk", 0), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey(id, "numElements", 0), createValue(numberOfElements));
             for (size_t i = 0; i < capacity; i += 1) {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
-                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]->clone()));
+                kvStore->sendToNode(createKey(id, buf, i % 5), createValue(from.chunks[i]->clone()));
                 delete[] buf;
             }
         }
@@ -632,25 +567,6 @@ class DistEffCharArr : public Object {
             return len;
         }
 
-        Key* createKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            return new Key(idClone, 0);
-        }
-
-        Value* createValue(size_t s) {
-            Value* val = new Value;
-            val->st = s;
-            return val;
-        }
-
-        Value* createValue(FixedCharArray* fixedArray) {
-            Value* val = new Value;
-            val->obj = fixedArray;
-            return val;
-        }
-
         /**
          * @brief Get the column at the given index
          *
@@ -661,7 +577,7 @@ class DistEffCharArr : public Object {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
             sprintf(buf, "%zu", chunkIdx);
-            Value* val = kvStore->getFromNode(createKey(buf));
+            Value* val = kvStore->getFromNode(createKey(id, buf, chunkIdx % 5));
             delete[] buf;
             Object* obj = val->obj;
             FixedCharArray* curChunk = dynamic_cast<FixedCharArray*>(obj);
@@ -702,20 +618,10 @@ class DistEffStrArr : public Object {
         DistEffStrArr(String* id_var, Distributable* kvStore_var) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = getSizeTFromKey("chunkSize");
-            capacity = getSizeTFromKey("capacity");
-            currentChunkIdx = getSizeTFromKey("currentChunk");
-            numberOfElements = getSizeTFromKey("numElements");
-        }
-
-        size_t getSizeTFromKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            Key* sizeTKey = new Key(idClone, 0);
-            size_t toReturn = kvStore->getFromNode(sizeTKey)->st;
-            delete sizeTKey;
-            return toReturn;
+            chunkSize = kvStore->getSizeT(createKey(id, "chunkSize", 0));
+            capacity = kvStore->getSizeT(createKey(id, "capacity", 0));
+            currentChunkIdx = kvStore->getSizeT(createKey(id, "currentChunk", 0));
+            numberOfElements = kvStore->getSizeT(createKey(id, "numElements", 0));
         }
 
         bool equals(Object* other) {
@@ -741,14 +647,14 @@ class DistEffStrArr : public Object {
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
 
-            kvStore->sendToNode(createKey("chunkSize"), createValue(chunkSize));
-            kvStore->sendToNode(createKey("capacity"), createValue(capacity));
-            kvStore->sendToNode(createKey("currentChunk"), createValue(currentChunkIdx));
-            kvStore->sendToNode(createKey("numElements"), createValue(numberOfElements));
+            kvStore->sendToNode(createKey(id, "chunkSize", 0), createValue(chunkSize));
+            kvStore->sendToNode(createKey(id, "capacity", 0), createValue(capacity));
+            kvStore->sendToNode(createKey(id, "currentChunk", 0), createValue(currentChunkIdx));
+            kvStore->sendToNode(createKey(id, "numElements", 0), createValue(numberOfElements));
             for (size_t i = 0; i < capacity; i += 1) {
                 char* buf = new char[length(i) + 1];
                 sprintf(buf, "%zu", i);
-                kvStore->sendToNode(createKey(buf), createValue(from.chunks[i]));
+                kvStore->sendToNode(createKey(id, buf, i % 5), createValue(from.chunks[i]));
                 delete[] buf;
             }
         }
@@ -763,30 +669,11 @@ class DistEffStrArr : public Object {
             return len;
         }
 
-        Key* createKey(char* suffix) {
-            String* idClone = id->clone();
-            idClone->concat("-");
-            idClone->concat(suffix);
-            return new Key(idClone, 0);
-        }
-
-        Value* createValue(size_t s) {
-            Value* val = new Value;
-            val->st = s;
-            return val;
-        }
-
-        Value* createValue(FixedStrArray* fixedStrArray) {
-            Value* val = new Value;
-            val->obj = fixedStrArray;
-            return val;
-        }
-
         String* get(size_t idx) {
             size_t chunkIdx = idx / chunkSize;
             char* buf = new char[length(idx) + 1];
             sprintf(buf, "%zu", chunkIdx);
-            FixedStrArray* curChunk = dynamic_cast<FixedStrArray*>(kvStore->getFromNode(createKey(buf))->obj);
+            FixedStrArray* curChunk = dynamic_cast<FixedStrArray*>(kvStore->getFromNode(createKey(id, buf, chunkIdx % 5))->obj);
             delete[] buf;
             return curChunk->get(idx % chunkSize);
         }

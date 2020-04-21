@@ -1,3 +1,5 @@
+#include <climits>
+
 #pragma once
 
 #include <unistd.h>
@@ -35,6 +37,7 @@ class NetworkIP : public Object {
 
         ~NetworkIP() override {
             close(sock_);
+            delete[] nodes_;
         }
 
         size_t index() { return this_node_; }
@@ -78,6 +81,8 @@ class NetworkIP : public Object {
                 nodes_[msg->sender_].id = msg->sender_;
                 nodes_[msg->sender_].address.sin_family = AF_INET;
                 nodes_[msg->sender_].address.sin_port = htons(msg->port);
+                nodes_[msg->sender_].send = -1;
+                nodes_[msg->sender_].recv = -1;
                 inet_aton(msg->client, &(nodes_[msg->sender_].address.sin_addr));
             }
             auto* ports = new size_t[num_nodes - 1];
@@ -92,6 +97,7 @@ class NetworkIP : public Object {
                 ipd.target_ = i;
                 send_msg(&ipd, false);
             }
+            std::cout<<&nodes_<<"\n";
         }
 
         void client_init(unsigned idx, size_t port, const char* server_adr, unsigned server_port) {
@@ -111,6 +117,8 @@ class NetworkIP : public Object {
                 nodes_[i + 1].id = i + 1;
                 nodes_[i + 1].address.sin_family = AF_INET;
                 nodes_[i + 1].address.sin_port = htons(ipd->ports[i]);
+                nodes_[i + 1].send = -1;
+                nodes_[i + 1].recv = -1;
                 inet_aton(ipd->addresses[i]->c_str(), &nodes_[i + 1].address.sin_addr);
             }
             delete ipd;
@@ -118,6 +126,7 @@ class NetworkIP : public Object {
 
         void send_msg(Message* msg, bool keepAlive) {
             NodeInfo & tgt = nodes_[msg->target_];
+            std::cout<<&nodes_<<"\n";
             if (tgt.send == -1) {
                 tgt.send = socket(AF_INET, SOCK_STREAM, 0);
                 assert(tgt.send >= 0 && "Unable to create client socket");
@@ -151,7 +160,9 @@ class NetworkIP : public Object {
         Message* recv_first_msg(bool keepAlive) {
             int req;
             accept_connection(req);
-            return recv_msg(req, keepAlive);
+            Message* msg = recv_message_(req);
+            if (!keepAlive) close(req);
+            return msg;
         }
 
         Message* recv_msg(int& req, bool keepAlive) {
@@ -203,6 +214,7 @@ class NetworkIP : public Object {
             int rd = 0;
             while (rd != size) rd += read(req, buf + rd, size - rd);
             Message* msg = Serializer::deserializeMessage(buf);
+            delete[] buf;
             return msg;
         }
 };
