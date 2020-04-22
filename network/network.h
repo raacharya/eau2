@@ -42,9 +42,8 @@ class Distributable : public Object {
         std::map<std::string, Transfer*> kvStore;
         size_t index;
         NetworkIP* network;
-        std::thread* pid;
-        std::thread* pid2;
-        std::thread** pids;
+        std::thread pid;
+        std::thread* pids;
         size_t pid_index;
         std::mutex mtx;
         std::condition_variable cv;
@@ -53,9 +52,11 @@ class Distributable : public Object {
         Distributable(size_t index_var) {
             index = index_var;
             network = new NetworkIP();
-            pid = new std::thread(&Distributable::start, this);
-            pid2 = new std::thread(&Distributable::startAndReceive, this);
-            pids = new std::thread*[5];
+            pid = std::thread(&Distributable::start, this);
+//            std::unique_lock<std::mutex> lck(network->mtx);
+//            while (!network->ready) network->cv.wait(lck);
+//            lck.unlock();
+            pids = new std::thread[5];
             pid_index = 0;
         }
 
@@ -69,13 +70,25 @@ class Distributable : public Object {
             ready = true;
             lck.unlock();
             cv.notify_all();
+            for (;;) {
+                int sock;
+                network->accept_connection(sock);
+                if (sock == -1) break;
+                Message* msg = network->recv_msg(sock, true);
+                if (msg->kind_ == MsgKind::Kill) {
+                    delete msg;
+                    break;
+                }
+                pids[pid_index] = std::thread(&Distributable::listen, this, msg);
+                pid_index += 1;
+
+            }
         }
 
-        void listen(int* sock) {
-            Message* msg = network->recv_msg(*sock, true);
+        void listen(Message* msg) {
             size_t sender = msg->sender_;
             do {
-                mtx.lock();
+//                mtx.lock();
                 if (msg->kind_ == MsgKind::Get) {
                     Get* get = dynamic_cast<Get*>(msg);
                     assert(kvStore.find(std::string(get->key->c_str())) != kvStore.end());
@@ -93,20 +106,8 @@ class Distributable : public Object {
                     kvStore[std::string(send->key->c_str())] = send->transfer;
                     delete send;
                 }
-                mtx.unlock();
-            } while ((msg = network->recv_msg(sender, true)));
-        }
-
-        void startAndReceive() {
-            std::unique_lock<std::mutex> lck(mtx);
-            while (!ready) cv.wait(lck);
-            lck.unlock();
-            for (;;) {
-                int sock;
-                network->accept_connection(sock);
-                pids[pid_index] = new std::thread(&Distributable::listen, this, &sock);
-                pid_index += 1;
-            }
+//                mtx.unlock();
+            } while ((msg = network->recv_msg(sender, true)) != nullptr);
         }
 
         void put(size_t node, String* key, size_t val) {
@@ -143,7 +144,6 @@ class Distributable : public Object {
                 Send* send = new Send(transfer, key->c_str());
                 send->sender_ = index;
                 send->target_ = node;
-                std::cout<<send->key<<"\n";
                 network->send_msg(send, true);
                 delete transfer;
                 delete send;
@@ -183,12 +183,12 @@ class Distributable : public Object {
 
         Transfer* get_(size_t node, char type, String* key) {
             Transfer* transfer;
-            mtx.lock();
+//            mtx.lock();
             if (kvStore.find(std::string(key->c_str())) != kvStore.end()) {
                 transfer = kvStore.find(std::string(key->c_str()))->second;
-                mtx.unlock();
+//                mtx.unlock();
             } else {
-                mtx.unlock();
+//                mtx.unlock();
                 Get* get = new Get(type, key->c_str());
                 get->sender_ = index;
                 get->target_ = node;
@@ -197,9 +197,9 @@ class Distributable : public Object {
                 Message* msg = network->recv_reply(node, true);
                 Send* send = dynamic_cast<Send*>(msg);
                 transfer = send->transfer;
-                mtx.lock();
+//                mtx.lock();
                 kvStore[std::string(key->c_str())] = transfer;
-                mtx.unlock();
+//                mtx.unlock();
                 delete send;
             }
             delete key;
@@ -211,14 +211,12 @@ class Distributable : public Object {
             for (std::map<std::string, Transfer*>::iterator itr = kvStore.begin(); itr != kvStore.end(); itr++) {
                 delete (itr->second);
             }
+            if (pid.joinable()) pid.join();
+            std::cout<<"Joined start"<<"\n";
             delete network;
-            delete pid;
-            delete pid2;
             for (size_t i = 0; i < 5; i += 1) {
-                if (pids[i] != nullptr) {
-                    pids[i]->join();
-                    delete pids[i];
-                }
+                if (pids[i].joinable()) pids[i].join();
+                std::cout<<"Joined "<<index<<" "<<i<<"\n";
             }
             delete[] pids;
         }

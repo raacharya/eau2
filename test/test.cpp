@@ -201,10 +201,14 @@ int main(int argc, char** argv) {
     auto** kds = new KDStore*[5];
     for (size_t i = 0; i < 5; i += 1) {
         kds[i] = new KDStore(i);
+        sleep(1);
     }
     for (size_t i = 0; i < 5; i += 1) {
         Trivial triv(i, kds[i]);
         triv.run_();
+    }
+    for (size_t i = 0; i < 5; i += 1) {
+        kds[i]->kvStore->network->shutdown();
     }
     for (size_t i = 0; i < 5; i += 1) {
         delete kds[i];

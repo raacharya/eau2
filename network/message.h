@@ -30,6 +30,11 @@ class Message : public Object {
 
 };
 
+class Kill : public Message {
+    public:
+        Kill(size_t sender, size_t target, size_t id) : Message(MsgKind::Kill, sender, target, id) {}
+};
+
 class Register : public Message {
     public:
         String* client;
@@ -40,6 +45,7 @@ class Register : public Message {
             port = port_;
             sender_ = idx_;
             target_ = 0;
+            id_ = 0;
             kind_ = MsgKind::Register;
         }
 
@@ -60,6 +66,8 @@ class Directory : public Message {
             ports = ports_;
             addresses = addresses_;
             kind_ = MsgKind::Directory;
+            id_ = 0;
+            sender_ = 0;
         }
 
         ~Directory() {
@@ -82,6 +90,7 @@ class Get : public Message {
             type = type_;
             key = new String(key_);
             kind_ = MsgKind::Get;
+            id_ = 0;
         }
 
         ~Get() {
@@ -199,42 +208,49 @@ class Send : public Message {
             kind_ = MsgKind::Send;
             key = new String(key_);
             transfer = new Transfer(var);
+            id_ = 0;
         }
 
         Send(FixedIntArray* var, const char* key_) {
             kind_ = MsgKind::Send;
             key = new String(key_);
             transfer = new Transfer(var);
+            id_ = 0;
         }
 
         Send(FixedBoolArray* var, const char* key_) {
             kind_ = MsgKind::Send;
             key = new String(key_);
             transfer = new Transfer(var);
+            id_ = 0;
         }
 
         Send(FixedFloatArray* var, const char* key_) {
             kind_ = MsgKind::Send;
             key = new String(key_);
             transfer = new Transfer(var);
+            id_ = 0;
         }
 
         Send(FixedStrArray* var, const char* key_) {
             kind_ = MsgKind::Send;
             key = new String(key_);
             transfer = new Transfer(var);
+            id_ = 0;
         }
 
         Send(FixedCharArray* var, const char* key_) {
             kind_ = MsgKind::Send;
             key = new String(key_);
             transfer = new Transfer(var);
+            id_ = 0;
         }
 
         Send(Transfer* var, const char* key_) {
             kind_ = MsgKind::Send;
             key = new String(key_);
             transfer = var;
+            id_ = 0;
         }
 
         ~Send() {

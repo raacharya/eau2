@@ -7,6 +7,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <thread>
+#include <condition_variable>
+#include <mutex>
 #include "serial.h"
 
 class NodeInfo : public Object {
@@ -32,6 +35,9 @@ class NetworkIP : public Object {
         size_t this_node_;
         int sock_;
         sockaddr_in ip_;
+//        std::mutex mtx;
+//        std::condition_variable cv;
+//        bool ready = false;
 
         int num_nodes = 5;
 
@@ -73,8 +79,12 @@ class NetworkIP : public Object {
         }
 
         void server_init(unsigned idx, size_t port) {
+//            std::unique_lock<std::mutex> lck(mtx);
             this_node_ = idx;
             init_sock_(port);
+//            ready = true;
+//            lck.unlock();
+//            cv.notify_all();
             nodes_ = new NodeInfo[num_nodes];
             for (size_t i = 2; i <= num_nodes; i += 1) {
                 auto* msg = dynamic_cast<Register*>(recv_first_msg(false));
@@ -98,7 +108,6 @@ class NetworkIP : public Object {
                 ipd.target_ = i;
                 send_msg(&ipd, false);
             }
-            std::cout<<&nodes_<<"\n";
         }
 
         void client_init(unsigned idx, size_t port, const char* server_adr, unsigned server_port) {
@@ -125,9 +134,20 @@ class NetworkIP : public Object {
             delete ipd;
         }
 
+        void shutdown() {
+            auto* kill = new Kill(this_node_, (this_node_ + 1) % num_nodes, 0);
+            NodeInfo & tgt = nodes_[kill->target_];
+            int conn = socket(AF_INET, SOCK_STREAM, 0);
+            assert(conn >= 0 && "Unable to create client socket");
+            if (connect(conn, (sockaddr *) &tgt.address, sizeof(tgt.address)) < 0)
+                assert(false && "Unable to connect to remote node");
+            send_msg_(kill, conn);
+            close(conn);
+            delete kill;
+        }
+
         void send_msg(Message* msg, bool keepAlive) {
             NodeInfo & tgt = nodes_[msg->target_];
-            std::cout<<&nodes_<<"\n";
             if (tgt.send == -1) {
                 tgt.send = socket(AF_INET, SOCK_STREAM, 0);
                 assert(tgt.send >= 0 && "Unable to create client socket");
@@ -211,7 +231,11 @@ class NetworkIP : public Object {
         Message* recv_message_(int& req) {
             if (req == -1) assert(false && "no established connection");
             size_t size = 0;
-            if (read(req, &size, sizeof(size_t)) == 0) assert(false && "failed to read");
+            if (read(req, &size, sizeof(size_t)) == 0) {
+                close(req);
+                req = -1;
+                return nullptr;
+            }
             char* buf = new char[size];
             int rd = 0;
             while (rd != size) rd += read(req, buf + rd, size - rd);

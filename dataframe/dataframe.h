@@ -345,6 +345,10 @@ class KDStore : public Object {
             kvStore = new Distributable(index);
         }
 
+        ~KDStore() {
+            delete kvStore;
+        }
+
         DistDataFrame *get(Key &key);
 
         void put(Key &key, DataFrame *df);
