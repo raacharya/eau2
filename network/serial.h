@@ -304,6 +304,8 @@ class Serializer: public Object {
                 buf = serializeGet(dynamic_cast<Get*>(m), size);
             } else if (m->kind_ == MsgKind::Kill) {
                 buf = serializeKill(dynamic_cast<Kill*>(m), size);
+            } else if (m->kind_ == MsgKind::Finished) {
+                buf = serializeFinished(dynamic_cast<Finished*>(m), size);
             }
             return buf;
         }
@@ -431,6 +433,23 @@ class Serializer: public Object {
             return buffer;
         }
 
+        static char* serializeFinished(Finished* m, size_t& size) {
+            char msgAbbr = 'F';
+            size_t msgAttributesSize = 0;
+            char* msgAttributes = serializeMsgAttributes(m, msgAttributesSize);
+            char* buffer = new char[1 + msgAttributesSize + m->key_->size() + 1];
+            size_t curIndex = 0;
+            buffer[0] = msgAbbr;
+            curIndex += 1;
+            for (size_t i = 0; i < msgAttributesSize; i += 1, curIndex += 1) {
+                buffer[curIndex] = msgAttributes[i];
+            }
+            delete[] msgAttributes;
+            serializeInBuffer(buffer, curIndex, m->key_);
+            size += curIndex;
+            return buffer;
+        }
+
         static char* serializeMsgAttributes(Message* msg, size_t& endIndex) {
             size_t bufSize = sizeof(size_t) * 3;
             char* buffer = new char[bufSize];
@@ -459,6 +478,8 @@ class Serializer: public Object {
                 return deserializeGet(buffer);
             } else if (buffer[0] == 'K') {
                 return deserializeKill(buffer);
+            } else if (buffer[0] == 'F') {
+                return deserializeFinished(buffer);
             }
             return nullptr;
         }
@@ -558,6 +579,17 @@ class Serializer: public Object {
             size_t id = deserializeSizeT(buffer, curIndex);
             auto* kill = new Kill(sender, target, id);
             return kill;
+        }
+
+        static Finished* deserializeFinished(char* buffer) {
+            size_t curIndex = 1;
+            size_t sender = deserializeSizeT(buffer, curIndex);
+            size_t target = deserializeSizeT(buffer, curIndex);
+            size_t id = deserializeSizeT(buffer, curIndex);
+            char* key = deserializeChar(buffer, curIndex);
+            auto* finished = new Finished(sender, target, id, key);
+            delete[] key;
+            return finished;
         }
 
         static int deserializeInt(const char* buffer, size_t& curIndex) {

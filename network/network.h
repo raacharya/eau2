@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <map>
+#include <set>
 #include "network_ip.h"
 
 class Key : public Object {
@@ -45,6 +46,9 @@ class Distributable : public Object {
         bool handshake_done = false;
         std::mutex init_sock_lock;
         std::condition_variable init_sock_cond;
+        std::set<std::string> completed_dfs;
+        std::mutex complete_df_lock;
+        std::condition_variable complete_df_cond;
 
         Distributable(size_t index_var) {
             index = index_var;
@@ -77,6 +81,14 @@ class Distributable : public Object {
                 if (msg->kind_ == MsgKind::Kill) {
                     delete msg;
                     break;
+                } else if (msg->kind_ == MsgKind::Finished) {
+                    Finished* finished = dynamic_cast<Finished*>(msg);
+                    std::unique_lock<std::mutex> df_lock(complete_df_lock);
+                    completed_dfs.insert(std::string(finished->key_->c_str()));
+                    df_lock.unlock();
+                    complete_df_cond.notify_all();
+                    delete finished;
+                    continue;
                 }
                 individual_conns[pid_index] = std::thread(&Distributable::listen, this, msg);
                 pid_index += 1;
@@ -103,8 +115,25 @@ class Distributable : public Object {
                     Send* send = dynamic_cast<Send*>(msg);
                     kvStore[std::string(send->key->c_str())] = send->transfer;
                     delete send;
+                } else if (msg->kind_ == MsgKind::Finished) {
+                    Finished* finished = dynamic_cast<Finished*>(msg);
+                    std::unique_lock<std::mutex> df_lock(complete_df_lock);
+                    completed_dfs.insert(std::string(finished->key_->c_str()));
+                    df_lock.unlock();
+                    complete_df_cond.notify_all();
+                    delete finished;
+                    continue;
                 }
             } while ((msg = network->recv_msg(sender, true)) != nullptr);
+        }
+
+        void send_finished_update(const char* key) {
+            for (size_t i = 0; i < 5; i += 1) {
+                if (index != i) {
+                    Finished* finished = new Finished(index, i, 0, key);
+                    network->send_msg(finished, true);
+                }
+            }
         }
 
         void put(size_t node, String* key, size_t val) {

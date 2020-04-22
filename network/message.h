@@ -32,8 +32,25 @@ class Message : public Object {
 
 class Kill : public Message {
     public:
-        Kill(size_t sender, size_t target, size_t id) : Message(MsgKind::Kill, sender, target, id) {}
+        Kill(size_t sender, size_t target, size_t id) :
+        Message(MsgKind::Kill, sender, target, id) {}
 };
+
+class Finished : public Message {
+    public:
+        String* key_;
+
+        Finished(size_t sender, size_t target, size_t id, const char* key) :
+        Message(MsgKind::Finished, sender, target, id) {
+            key_ = new String(key);
+        }
+
+        ~Finished() {
+            delete key_;
+        }
+};
+
+
 
 class Register : public Message {
     public:

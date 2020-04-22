@@ -505,6 +505,10 @@ class EffStrArr : public Object {
             chunks = newChunks;
         }
 
+        void pushBack(const char* value) {
+            pushBack(new String(value));
+        }
+
         void pushBack(String* value) {
             FixedStrArray* currentChunk = chunks[currentChunkIdx];
             if (currentChunk->size() == currentChunk->numElements()) {

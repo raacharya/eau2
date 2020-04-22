@@ -388,7 +388,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     df.add_column(col, nullptr);
     delete col;
     auto* newDf = new DistDataFrame(df, key, kdStore->kvStore);
-
+    kdStore->kvStore->send_finished_update(key->key->c_str());
     return newDf;
 }
 
@@ -460,5 +460,9 @@ void KDStore::put(Key& key, DataFrame* df) {
  * @return - DistDatafram associated with the key
  */
 DistDataFrame* KDStore::waitAndGet(Key& key) {
+    std::unique_lock<std::mutex> df_lock(kvStore->complete_df_lock);
+    while (kvStore->completed_dfs.find(std::string(key.key->c_str())) != kvStore->completed_dfs.end())
+        kvStore->complete_df_cond.wait(df_lock);
+    df_lock.unlock();
     return new DistDataFrame(&key, kvStore);
 }
