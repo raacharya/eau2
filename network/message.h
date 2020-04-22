@@ -32,15 +32,19 @@ class Message : public Object {
 
 class Register : public Message {
     public:
-        char* client;
+        String* client;
         size_t port;
 
-        Register(unsigned idx_, size_t port_, char* client_) {
-            client = client_;
+        Register(unsigned idx_, size_t port_, const char* client_) {
+            client = new String(client_);
             port = port_;
             sender_ = idx_;
             target_ = 0;
             kind_ = MsgKind::Register;
+        }
+
+        ~Register() {
+            delete client;
         }
 };
 
@@ -67,12 +71,14 @@ class Directory : public Message {
         }
 };
 
+
+
 class Get : public Message {
     public:
-        char type; // one of 'I', 'F', 'B', 'S', 'T'
+        char type; // one of 'I', 'F', 'B', 'S', 'T', 'C'
         String* key;
 
-        Get(char type_, char* key_) {
+        Get(char type_, const char* key_) {
             type = type_;
             key = new String(key_);
             kind_ = MsgKind::Get;
@@ -94,6 +100,7 @@ union Data {
     FixedFloatArray* ff;
     FixedBoolArray* fb;
     FixedStrArray* fs;
+    FixedCharArray* fc;
 };
 
 class Transfer : public Object {
@@ -131,6 +138,12 @@ class Transfer : public Object {
             data->fs = var;
         }
 
+        Transfer(FixedCharArray* var) {
+            type = 'C';
+            data = new Data();
+            data->fc = var;
+        }
+
         ~Transfer() {
             if (type == 'I') {
                 delete data->fi;
@@ -140,8 +153,40 @@ class Transfer : public Object {
                 delete data->fb;
             } else if (type == 'S') {
                 delete data->fs;
+            } else if (type == 'C') {
+                delete data->fc;
             }
             delete data;
+        }
+
+        size_t s_t() {
+            assert(type == 'T');
+            return data->st;
+        }
+
+        FixedIntArray* int_chunk() {
+            assert(type == 'I');
+            return data->fi;
+        }
+
+        FixedFloatArray* float_chunk() {
+            assert(type == 'F');
+            return data->ff;
+        }
+
+        FixedBoolArray* bool_chunk() {
+            assert(type == 'B');
+            return data->fb;
+        }
+
+        FixedStrArray* str_chunk() {
+            assert(type == 'S');
+            return data->fs;
+        }
+
+        FixedCharArray* char_chunk() {
+            assert(type == 'C');
+            return data->fc;
         }
 };
 
@@ -180,8 +225,16 @@ class Send : public Message {
             transfer = new Transfer(var);
         }
 
-        void delete_transfer() {
-            delete transfer;
+        Send(FixedCharArray* var, const char* key_) {
+            kind_ = MsgKind::Send;
+            key = new String(key_);
+            transfer = new Transfer(var);
+        }
+
+        Send(Transfer* var, const char* key_) {
+            kind_ = MsgKind::Send;
+            key = new String(key_);
+            transfer = var;
         }
 
         ~Send() {

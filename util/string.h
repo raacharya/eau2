@@ -86,7 +86,7 @@ class String : public Object {
         }
 
         /** Concat char* to this string. */
-        void concat(const char* csr) {
+        String* concat(const char* csr) {
             size_t newSize = size_ + strlen(csr) + 1;
             char* newCstr = new char[newSize];
             strcpy(newCstr, cstr_);
@@ -95,6 +95,16 @@ class String : public Object {
             newCstr[size_] = '\0';
             delete[] cstr_;
             cstr_ = newCstr;
+            return this;
+        }
+
+        /** Concat the string value of num to this string. */
+        String* concat(size_t num) {
+            char* buf = new char[length(num) + 1];
+            sprintf(buf, "%zu", num);
+            concat(buf);
+            delete[] buf;
+            return this;
         }
 };
 

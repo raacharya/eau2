@@ -96,7 +96,7 @@ void testMessageGet() {
     size_t target = 91;
     size_t id = 1;
     char type = 'B';
-    char* key = "df1-chunk1";
+    const char* key = "df1-chunk1";
     Get* g = new Get(type, key);
     g->sender_ = sender;
     g->target_ = target;
@@ -108,7 +108,7 @@ void testMessageGet() {
     assert(target == get->target_);
     assert(id == get->id_);
     assert(type == get->type);
-    assert(strcmp(key, get->key) == 0);
+    assert(strcmp(key, get->key->c_str()) == 0);
     delete[] serializedMessage;
     delete get;
     std::cout << "works for get" << "\n";
@@ -123,10 +123,7 @@ void testMessageSend() {
         arr->pushBack(i);
     }
     char type = 'I';
-    auto* c = new Chunk();
-    c->fi = arr;
-    char* key = "finna";
-    Send* s = new Send(c, type, key);
+    Send* s = new Send(arr, "finna");
     s->sender_ = sender;
     s->target_ = target;
     s->id_ = id;
@@ -136,13 +133,13 @@ void testMessageSend() {
     assert(sender == send->sender_);
     assert(target == send->target_);
     assert(id == send->id_);
-    assert(type == send->type);
-    assert(strcmp(key, send->key) == 0);
-    assert(0 == send->c->fi->get(0));
-    assert(1 == send->c->fi->get(1));
-    assert(2 == send->c->fi->get(2));
-    assert(3 == send->c->fi->get(3));
-    assert(4 == send->c->fi->get(4));
+    assert(type == send->type());
+    assert(strcmp("finna", send->key->c_str()) == 0);
+    assert(0 == send->transfer->int_chunk()->get(0));
+    assert(1 == send->transfer->int_chunk()->get(1));
+    assert(2 == send->transfer->int_chunk()->get(2));
+    assert(3 == send->transfer->int_chunk()->get(3));
+    assert(4 == send->transfer->int_chunk()->get(4));
     delete[] serializedMessage;
     delete send;
     std::cout << "works for send" << "\n";
@@ -154,7 +151,7 @@ void testMessageSend() {
 void testMessageRegister() {
     size_t sender = 90;
     size_t id = 92;
-    char* client = "192.0.2.33";
+    const char* client = "192.0.2.33";
     size_t port = 8080;
     auto* m = new Register(sender, port, client);
     m->id_ = id;
@@ -164,7 +161,7 @@ void testMessageRegister() {
     assert(sender == deserializedMessage->sender_);
     assert(0 == deserializedMessage->target_);
     assert(id == deserializedMessage->id_);
-    assert(strcmp(client, deserializedMessage->client) == 0);
+    assert(strcmp(client, deserializedMessage->client->c_str()) == 0);
     assert(port == deserializedMessage->port);
     delete[] serializedMessage;
     delete deserializedMessage;

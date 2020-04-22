@@ -365,11 +365,10 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
-
     Schema s{};
     DataFrame df(s);
     df.add_column(col, nullptr);
-
+    delete col;
     auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
     return newDf;
@@ -380,11 +379,10 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
-
     Schema s{};
     DataFrame df(s);
     df.add_column(col, nullptr);
-
+    delete col;
     auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
     return newDf;
@@ -403,11 +401,10 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
-
     Schema s{};
     DataFrame df(s);
     df.add_column(col, nullptr);
-
+    delete col;
     auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
     return newDf;
@@ -426,11 +423,10 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
-
     Schema s{};
     DataFrame df(s);
     df.add_column(col, nullptr);
-
+    delete col;
     auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
 
     return newDf;

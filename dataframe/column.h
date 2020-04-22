@@ -314,7 +314,9 @@ class DistIntColumn : public DistColumn {
          * @brief Destroy the Int Column object
          *
          */
-        ~DistIntColumn() {}
+        ~DistIntColumn() {
+            delete array;
+        }
 };
 
 /*************************************************************************
@@ -519,7 +521,9 @@ class DistBoolColumn : public DistColumn {
          * @brief Destroy the Int Column object
          *
          */
-        ~DistBoolColumn() {}
+        ~DistBoolColumn() {
+            delete array;
+        }
 };
 
 /*************************************************************************
@@ -717,7 +721,9 @@ class DistFloatColumn : public DistColumn {
          * @brief Destroy the Int Column object
          *
          */
-        ~DistFloatColumn() {}
+        ~DistFloatColumn() {
+            delete array;
+        }
 };
 
 /*************************************************************************
@@ -915,7 +921,9 @@ class DistStringColumn : public DistColumn {
          * @brief Destroy the Int Column object
          *
          */
-        ~DistStringColumn() {}
+        ~DistStringColumn() {
+            delete array;
+        }
 };
 
 /**
@@ -1050,7 +1058,6 @@ class FixedColArray : public Object {
 class DistFixedColArray : public Object {
     public:
         String* id;
-        Distributable* kvStore;
         size_t used;
         size_t capacity;
         DistColumn** array;
@@ -1060,33 +1067,24 @@ class DistFixedColArray : public Object {
          */
         DistFixedColArray(FixedColArray &from, String* id_var, Distributable* kvStore_var) : Object() {
             id = id_var->clone();
-            kvStore = kvStore_var;
             used = from.array->used;
             capacity = from.array->capacity;
-
-            kvStore->sendToNode(createKey(id, "used", 0), createValue(used));
-            kvStore->sendToNode(createKey(id, "capacity", 0), createValue(capacity));
+            kvStore_var->put(0, id->clone()->concat("-used"), used);
+            kvStore_var->put(0, id->clone()->concat("-capacity"), capacity);
             array = new DistColumn*[capacity];
             for (size_t i = 0; i < used; i += 1) {
                 Column* col = from.get(i);
-                char* buf = new char[length(i) + 1];
-                sprintf(buf, "%zu", i);
                 String* col_id = id_var->clone();
                 col_id->concat("-");
-                col_id->concat(buf);
-                delete[] buf;
+                col_id->concat(i);
                 if (col->get_type() == 'I') {
-                    DistIntColumn* copy = new DistIntColumn(*col->as_int(), col_id, kvStore);
-                    array[i] = copy;
+                    array[i] = new DistIntColumn(*col->as_int(), col_id, kvStore_var);
                 } else if (col->get_type() == 'F') {
-                    DistFloatColumn* copy = new DistFloatColumn(*col->as_float(), col_id, kvStore);
-                    array[i] = copy;
+                    array[i] = new DistFloatColumn(*col->as_float(), col_id, kvStore_var);
                 } else if (col->get_type() == 'B') {
-                    DistBoolColumn* copy = new DistBoolColumn(*col->as_bool(), col_id, kvStore);
-                    array[i] = copy;
+                    array[i] = new DistBoolColumn(*col->as_bool(), col_id, kvStore_var);
                 } else {
-                    DistStringColumn* copy = new DistStringColumn(*col->as_string(), col_id, kvStore);
-                    array[i] = copy;
+                    array[i] = new DistStringColumn(*col->as_string(), col_id, kvStore_var);
                 }
                 delete col_id;
             }
@@ -1098,42 +1096,28 @@ class DistFixedColArray : public Object {
          */
         DistFixedColArray(DistEffCharArr* types, String* id_var, Distributable* kvStore_var) : Object() {
             id = id_var->clone();
-            kvStore = kvStore_var;
-            used = kvStore->getSizeT(createKey(id, "used", 0));
-            capacity = kvStore->getSizeT(createKey(id, "capacity", 0));
+            used = kvStore_var->get_size_t(0, id->clone()->concat("-used"));
+            capacity = kvStore_var->get_size_t(0, id->clone()->concat("-capacity"));
             array = new DistColumn*[capacity];
             for (size_t i = 0; i < used; i += 1) {
-                char* buf = new char[length(i) + 1];
-                sprintf(buf, "%zu", i);
                 String* col_id = id_var->clone();
                 col_id->concat("-");
-                col_id->concat(buf);
-                delete[] buf;
+                col_id->concat(i);
                 if (types->get(i) == 'I') {
-                    DistIntColumn* copy = new DistIntColumn(col_id, kvStore);
+                    DistIntColumn* copy = new DistIntColumn(col_id, kvStore_var);
                     array[i] = copy;
                 } else if (types->get(i) == 'F') {
-                    DistFloatColumn* copy = new DistFloatColumn(col_id, kvStore);
+                    DistFloatColumn* copy = new DistFloatColumn(col_id, kvStore_var);
                     array[i] = copy;
                 } else if (types->get(i) == 'B') {
-                    DistBoolColumn* copy = new DistBoolColumn(col_id, kvStore);
+                    DistBoolColumn* copy = new DistBoolColumn(col_id, kvStore_var);
                     array[i] = copy;
                 } else {
-                    DistStringColumn* copy = new DistStringColumn(col_id, kvStore);
+                    DistStringColumn* copy = new DistStringColumn(col_id, kvStore_var);
                     array[i] = copy;
                 }
                 delete col_id;
             }
-        }
-
-        size_t length(size_t s) {
-            size_t len = 1;
-            s = s / 10;
-            while (s) {
-                s = s / 10;
-                len += 1;
-            }
-            return len;
         }
 
 
@@ -1318,18 +1302,13 @@ class DistEffColArr : public Object {
         DistEffColArr(DistEffCharArr* types, String* id_var, Distributable* kvStore_var) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = kvStore->getSizeT(createKey(id, "chunkSize", 0));
-            capacity = kvStore->getSizeT(createKey(id, "capacity", 0));
-            currentChunkIdx = kvStore->getSizeT(createKey(id, "currentChunk", 0));
-            numberOfElements = kvStore->getSizeT(createKey(id, "numElements", 0));
+            chunkSize = kvStore->get_size_t(0, id->clone()->concat("-chunkSize"));
+            capacity = kvStore->get_size_t(0, id->clone()->concat("-capacity"));
+            currentChunkIdx = kvStore->get_size_t(0, id->clone()->concat("-currentChunk"));
+            numberOfElements = kvStore->get_size_t(0, id->clone()->concat("-numElements"));
             array = new DistFixedColArray*[capacity];
             for (size_t i = 0; i < capacity; i += 1) {
-                char* buf = new char[length(i) + 1];
-                sprintf(buf, "%zu", i);
-                String* col_id = id_var->clone();
-                col_id->concat("-");
-                col_id->concat(buf);
-                delete[] buf;
+                String* col_id = id->clone()->concat("-")->concat(i);
                 array[i] = new DistFixedColArray(types, col_id, kvStore);
                 delete col_id;
             }
@@ -1348,30 +1327,15 @@ class DistEffColArr : public Object {
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
             array = new DistFixedColArray*[capacity];
-            kvStore->sendToNode(createKey(id, "chunkSize", 0), createValue(chunkSize));
-            kvStore->sendToNode(createKey(id, "capacity", 0), createValue(capacity));
-            kvStore->sendToNode(createKey(id, "currentChunk", 0), createValue(currentChunkIdx));
-            kvStore->sendToNode(createKey(id, "numElements", 0), createValue(numberOfElements));
+            kvStore->put(0, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(0, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(0, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(0, id->clone()->concat("-numElements"), numberOfElements);
             for (size_t i = 0; i < capacity; i += 1) {
-                char* buf = new char[length(i) + 1];
-                sprintf(buf, "%zu", i);
-                String* col_id = id_var->clone();
-                col_id->concat("-");
-                col_id->concat(buf);
-                delete[] buf;
+                String* col_id = id->clone()->concat("-")->concat(i);
                 array[i] = new DistFixedColArray(*from.chunks[i], col_id, kvStore);
                 delete col_id;
             }
-        }
-
-        size_t length(size_t s) {
-            size_t len = 1;
-            s = s / 10;
-            while (s) {
-                s = s / 10;
-                len += 1;
-            }
-            return len;
         }
 
         /**

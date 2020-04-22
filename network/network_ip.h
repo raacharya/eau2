@@ -83,7 +83,8 @@ class NetworkIP : public Object {
                 nodes_[msg->sender_].address.sin_port = htons(msg->port);
                 nodes_[msg->sender_].send = -1;
                 nodes_[msg->sender_].recv = -1;
-                inet_aton(msg->client, &(nodes_[msg->sender_].address.sin_addr));
+                inet_aton(msg->client->c_str(), &(nodes_[msg->sender_].address.sin_addr));
+                delete msg;
             }
             auto* ports = new size_t[num_nodes - 1];
             auto** addresses = new String*[num_nodes - 1];
@@ -155,6 +156,7 @@ class NetworkIP : public Object {
             char* buf = Serializer::serialize(msg, size);
             send(sock, &size, sizeof(size_t), 0);
             send(sock, buf, size, 0);
+            delete[] buf;
         }
 
         Message* recv_first_msg(bool keepAlive) {

@@ -281,7 +281,7 @@ class Serializer: public Object {
             char msgAbbr = 'R';
             size_t msgAttributesSize = 0;
             char* msgAttributes = serializeMsgAttributes(m, msgAttributesSize);
-            char* buffer = new char[1 + msgAttributesSize + sizeof(size_t) + strlen(m->client) + 1];
+            char* buffer = new char[1 + msgAttributesSize + sizeof(size_t) + m->client->size() + 1];
             size_t curIndex = 0;
             buffer[curIndex] = msgAbbr;
             curIndex += 1;
@@ -418,6 +418,7 @@ class Serializer: public Object {
             size_t port = deserializeSizeT(buffer, curIndex);
             char* client = deserializeChar(buffer, curIndex);
             auto* r = new Register(sender, port, client);
+            delete[] client;
             r->target_ = target;
             r->id_ = id;
             return r;
@@ -432,6 +433,7 @@ class Serializer: public Object {
             curIndex += 1;
             char* key = deserializeChar(buffer, curIndex);
             Get* g = new Get(type, key);
+            delete[] key;
             g->sender_ = sender;
             g->target_ = target;
             g->id_ = id;
@@ -460,6 +462,7 @@ class Serializer: public Object {
                 FixedStrArray* arr = deserializeFixedStrArr(buffer, curIndex);
                 send = new Send(arr, key);
             }
+            delete[] key;
             send->sender_ = sender;
             send->target_ = target;
             send->id_ = id;
@@ -524,7 +527,10 @@ class Serializer: public Object {
         }
 
         static String* deserializeString(const char* buffer, size_t& curIndex) {
-            return new String(deserializeChar(buffer, curIndex));
+            char* c_str = deserializeChar(buffer, curIndex);
+            String* str = new String(c_str);
+            delete[] c_str;
+            return str;
         }
 
         static char* deserializeChar(const char* buffer, size_t& curIndex) {
