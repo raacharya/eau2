@@ -240,8 +240,8 @@ class DistIntColumn : public DistColumn {
          * @brief Construct a new Int Column object
          *
          */
-        DistIntColumn(String* id, Distributable* kv_store) {
-            array = new DistEffIntArr(id, kv_store);
+        DistIntColumn(String* id, Distributable* kv_store, size_t metadata_node) {
+            array = new DistEffIntArr(id, kv_store, metadata_node);
             type = 'I';
         }
 
@@ -250,8 +250,8 @@ class DistIntColumn : public DistColumn {
          *
          * @param from
          */
-        DistIntColumn(IntColumn& from, String* id, Distributable* kv_store) {
-            array = new DistEffIntArr(*from.array, id, kv_store);
+        DistIntColumn(IntColumn& from, String* id, Distributable* kv_store, size_t metadata_node) {
+            array = new DistEffIntArr(*from.array, id, kv_store, metadata_node);
             type = 'I';
         }
 
@@ -447,8 +447,8 @@ class DistBoolColumn : public DistColumn {
          * @brief Construct a new Int Column object
          *
          */
-        DistBoolColumn(String* id, Distributable* kv_store) {
-            array = new DistEffBoolArr(id, kv_store);
+        DistBoolColumn(String* id, Distributable* kv_store, size_t metadata_node) {
+            array = new DistEffBoolArr(id, kv_store, metadata_node);
             type = 'B';
         }
 
@@ -457,8 +457,8 @@ class DistBoolColumn : public DistColumn {
          *
          * @param from
          */
-        DistBoolColumn(BoolColumn& from, String* id, Distributable* kv_store) {
-            array = new DistEffBoolArr(*from.array, id, kv_store);
+        DistBoolColumn(BoolColumn& from, String* id, Distributable* kv_store, size_t metadata_node) {
+            array = new DistEffBoolArr(*from.array, id, kv_store, metadata_node);
             type = 'B';
         }
 
@@ -647,8 +647,8 @@ class DistFloatColumn : public DistColumn {
          * @brief Construct a new Int Column object
          *
          */
-        DistFloatColumn(String* id, Distributable* kv_store) {
-            array = new DistEffFloatArr(id, kv_store);
+        DistFloatColumn(String* id, Distributable* kv_store, size_t metadata_node) {
+            array = new DistEffFloatArr(id, kv_store, metadata_node);
             type = 'F';
         }
 
@@ -657,8 +657,8 @@ class DistFloatColumn : public DistColumn {
          *
          * @param from
          */
-        DistFloatColumn(FloatColumn& from, String* id, Distributable* kv_store) {
-            array = new DistEffFloatArr(*from.array, id, kv_store);
+        DistFloatColumn(FloatColumn& from, String* id, Distributable* kv_store, size_t metadata_node) {
+            array = new DistEffFloatArr(*from.array, id, kv_store, metadata_node);
             type = 'F';
         }
 
@@ -847,8 +847,8 @@ class DistStringColumn : public DistColumn {
          * @brief Construct a new Int Column object
          *
          */
-        DistStringColumn(String* id, Distributable* kv_store) {
-            array = new DistEffStrArr(id, kv_store);
+        DistStringColumn(String* id, Distributable* kv_store, size_t metadata_node) {
+            array = new DistEffStrArr(id, kv_store, metadata_node);
             type = 'S';
         }
 
@@ -857,8 +857,8 @@ class DistStringColumn : public DistColumn {
          *
          * @param from
          */
-        DistStringColumn(StringColumn& from, String* id, Distributable* kv_store) {
-            array = new DistEffStrArr(*from.array, id, kv_store);
+        DistStringColumn(StringColumn& from, String* id, Distributable* kv_store, size_t metadata_node) {
+            array = new DistEffStrArr(*from.array, id, kv_store, metadata_node);
             type = 'S';
         }
 
@@ -1078,13 +1078,13 @@ class DistFixedColArray : public Object {
                 col_id->concat("-");
                 col_id->concat(i);
                 if (col->get_type() == 'I') {
-                    array[i] = new DistIntColumn(*col->as_int(), col_id, kvStore_var);
+                    array[i] = new DistIntColumn(*col->as_int(), col_id, kvStore_var, i % 5);
                 } else if (col->get_type() == 'F') {
-                    array[i] = new DistFloatColumn(*col->as_float(), col_id, kvStore_var);
+                    array[i] = new DistFloatColumn(*col->as_float(), col_id, kvStore_var, i % 5);
                 } else if (col->get_type() == 'B') {
-                    array[i] = new DistBoolColumn(*col->as_bool(), col_id, kvStore_var);
+                    array[i] = new DistBoolColumn(*col->as_bool(), col_id, kvStore_var, i % 5);
                 } else {
-                    array[i] = new DistStringColumn(*col->as_string(), col_id, kvStore_var);
+                    array[i] = new DistStringColumn(*col->as_string(), col_id, kvStore_var, i % 5);
                 }
                 delete col_id;
             }
@@ -1104,16 +1104,16 @@ class DistFixedColArray : public Object {
                 col_id->concat("-");
                 col_id->concat(i);
                 if (types->get(i) == 'I') {
-                    DistIntColumn* copy = new DistIntColumn(col_id, kvStore_var);
+                    DistIntColumn* copy = new DistIntColumn(col_id, kvStore_var, i % 5);
                     array[i] = copy;
                 } else if (types->get(i) == 'F') {
-                    DistFloatColumn* copy = new DistFloatColumn(col_id, kvStore_var);
+                    DistFloatColumn* copy = new DistFloatColumn(col_id, kvStore_var, i % 5);
                     array[i] = copy;
                 } else if (types->get(i) == 'B') {
-                    DistBoolColumn* copy = new DistBoolColumn(col_id, kvStore_var);
+                    DistBoolColumn* copy = new DistBoolColumn(col_id, kvStore_var, i % 5);
                     array[i] = copy;
                 } else {
-                    DistStringColumn* copy = new DistStringColumn(col_id, kvStore_var);
+                    DistStringColumn* copy = new DistStringColumn(col_id, kvStore_var, i % 5);
                     array[i] = copy;
                 }
                 delete col_id;

@@ -22,7 +22,7 @@ class Trivial : public Application {
     public:
         explicit Trivial(size_t idx, KDStore* kd_var) : Application(idx, kd_var) { }
         void run_() override {
-            if (index == 0) {
+            if (index == 2) {
                 size_t SZ = 1000 * 1;
                 auto *vals = new float[SZ];
                 double sum = 0;

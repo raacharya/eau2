@@ -11,15 +11,14 @@ class Key : public Object {
         String* key;
         size_t node;
 
-        Key(String* strKey, size_t homeNode) : Object() {
-            key = strKey;
-            node = homeNode;
-        }
-
         Key(const char* strKey, size_t homeNode) : Object() {
             key = new String(strKey);
             node = homeNode;
         }
+
+        ~Key() {
+            delete key;
+        };
 
         bool equals(Object* o) {
             if (o == this) return true;
@@ -31,10 +30,6 @@ class Key : public Object {
         size_t hash_me() {
             return key->hash_me();
         }
-
-        ~Key() {
-            delete key;
-        };
 };
 
 class Distributable : public Object {
@@ -42,34 +37,38 @@ class Distributable : public Object {
         std::map<std::string, Transfer*> kvStore;
         size_t index;
         NetworkIP* network;
-        std::thread pid;
-        std::thread* pids;
+        std::thread accept_conn_pid;
+        std::thread* individual_conns;
         size_t pid_index;
-        std::mutex mtx;
-        std::condition_variable cv;
-        bool ready = false;
+        std::mutex handshake_lock;
+        std::condition_variable handshake_cond;
+        bool handshake_done = false;
+        std::mutex init_sock_lock;
+        std::condition_variable init_sock_cond;
 
         Distributable(size_t index_var) {
             index = index_var;
-            network = new NetworkIP();
-            pid = std::thread(&Distributable::start, this);
-//            std::unique_lock<std::mutex> lck(network->mtx);
-//            while (!network->ready) network->cv.wait(lck);
-//            lck.unlock();
-            pids = new std::thread[5];
+            network = new NetworkIP(&init_sock_lock, &init_sock_cond);
+            accept_conn_pid = std::thread(&Distributable::start, this);
+            if (index == 0) {
+                std::unique_lock<std::mutex> lck(init_sock_lock);
+                while (!network->init_sock_done) init_sock_cond.wait(lck);
+                lck.unlock();
+            }
+            individual_conns = new std::thread[5];
             pid_index = 0;
         }
 
         void start() {
-            std::unique_lock<std::mutex> lck(mtx);
+            std::unique_lock<std::mutex> lck(handshake_lock);
             if (index == 0) {
                 network->server_init(index, 9000);
             } else {
                 network->client_init(index, 9000 + index, "127.0.0.1", 9000);
             }
-            ready = true;
+            handshake_done = true;
             lck.unlock();
-            cv.notify_all();
+            handshake_cond.notify_all();
             for (;;) {
                 int sock;
                 network->accept_connection(sock);
@@ -79,7 +78,7 @@ class Distributable : public Object {
                     delete msg;
                     break;
                 }
-                pids[pid_index] = std::thread(&Distributable::listen, this, msg);
+                individual_conns[pid_index] = std::thread(&Distributable::listen, this, msg);
                 pid_index += 1;
 
             }
@@ -88,7 +87,6 @@ class Distributable : public Object {
         void listen(Message* msg) {
             size_t sender = msg->sender_;
             do {
-//                mtx.lock();
                 if (msg->kind_ == MsgKind::Get) {
                     Get* get = dynamic_cast<Get*>(msg);
                     assert(kvStore.find(std::string(get->key->c_str())) != kvStore.end());
@@ -106,7 +104,6 @@ class Distributable : public Object {
                     kvStore[std::string(send->key->c_str())] = send->transfer;
                     delete send;
                 }
-//                mtx.unlock();
             } while ((msg = network->recv_msg(sender, true)) != nullptr);
         }
 
@@ -135,8 +132,8 @@ class Distributable : public Object {
         }
 
         void put_(size_t node, String* key, Transfer* transfer) {
-            std::unique_lock<std::mutex> lck(mtx);
-            while (!ready) cv.wait(lck);
+            std::unique_lock<std::mutex> lck(handshake_lock);
+            while (!handshake_done) handshake_cond.wait(lck);
             lck.unlock();
             if (node == index) {
                 kvStore[std::string(key->c_str())] = transfer;
@@ -183,12 +180,9 @@ class Distributable : public Object {
 
         Transfer* get_(size_t node, char type, String* key) {
             Transfer* transfer;
-//            mtx.lock();
             if (kvStore.find(std::string(key->c_str())) != kvStore.end()) {
                 transfer = kvStore.find(std::string(key->c_str()))->second;
-//                mtx.unlock();
             } else {
-//                mtx.unlock();
                 Get* get = new Get(type, key->c_str());
                 get->sender_ = index;
                 get->target_ = node;
@@ -197,9 +191,7 @@ class Distributable : public Object {
                 Message* msg = network->recv_reply(node, true);
                 Send* send = dynamic_cast<Send*>(msg);
                 transfer = send->transfer;
-//                mtx.lock();
                 kvStore[std::string(key->c_str())] = transfer;
-//                mtx.unlock();
                 delete send;
             }
             delete key;
@@ -208,17 +200,21 @@ class Distributable : public Object {
         }
 
         ~Distributable() {
+            std::cout<<"deleting\n";
             for (std::map<std::string, Transfer*>::iterator itr = kvStore.begin(); itr != kvStore.end(); itr++) {
                 delete (itr->second);
             }
-            if (pid.joinable()) pid.join();
-            std::cout<<"Joined start"<<"\n";
+            network->shutdown();
+            std::cout<<"shutdown\n";
+            if (accept_conn_pid.joinable()) accept_conn_pid.join();
+            std::cout<<"start\n";
             delete network;
+            std::cout<<"network\n";
             for (size_t i = 0; i < 5; i += 1) {
-                if (pids[i].joinable()) pids[i].join();
-                std::cout<<"Joined "<<index<<" "<<i<<"\n";
+                if (individual_conns[i].joinable()) individual_conns[i].join();
+                std::cout<<i<<"\n";
             }
-            delete[] pids;
+            delete[] individual_conns;
         }
 };
 
@@ -239,13 +235,13 @@ class DistEffIntArr : public Object {
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffIntArr(String* id_var, Distributable* kvStore_var) {
+        DistEffIntArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = kvStore->get_size_t(0, id->clone()->concat("-chunkSize"));
-            capacity = kvStore->get_size_t(0, id->clone()->concat("-capacity"));
-            currentChunkIdx = kvStore->get_size_t(0, id->clone()->concat("-currentChunk"));
-            numberOfElements = kvStore->get_size_t(0, id->clone()->concat("-numElements"));
+            chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
+            capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
+            currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
+            numberOfElements = kvStore->get_size_t(metadata_node, id->clone()->concat("-numElements"));
         }
 
         /**
@@ -253,17 +249,17 @@ class DistEffIntArr : public Object {
          *
          * @param from
          */
-        DistEffIntArr(EffIntArr& from, String* id_var, Distributable* kvStore_var) {
+        DistEffIntArr(EffIntArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
-            kvStore->put(0, id->clone()->concat("-chunkSize"), chunkSize);
-            kvStore->put(0, id->clone()->concat("-capacity"), capacity);
-            kvStore->put(0, id->clone()->concat("-currentChunk"), currentChunkIdx);
-            kvStore->put(0, id->clone()->concat("-numElements"), numberOfElements);
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
             for (size_t i = 0; i < capacity; i += 1) {
                 kvStore->put(i % 5, id->clone()->concat("-")->concat(i), from.chunks[i]->clone());
             }
@@ -316,13 +312,13 @@ class DistEffFloatArr : public Object {
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffFloatArr(String* id_var, Distributable* kvStore_var) {
+        DistEffFloatArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = kvStore->get_size_t(0, id->clone()->concat("-chunkSize"));
-            capacity = kvStore->get_size_t(0, id->clone()->concat("-capacity"));
-            currentChunkIdx = kvStore->get_size_t(0, id->clone()->concat("-currentChunk"));
-            numberOfElements = kvStore->get_size_t(0, id->clone()->concat("-numElements"));
+            chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
+            capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
+            currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
+            numberOfElements = kvStore->get_size_t(metadata_node, id->clone()->concat("-numElements"));
         }
 
         /**
@@ -330,17 +326,17 @@ class DistEffFloatArr : public Object {
          *
          * @param from
          */
-        DistEffFloatArr(EffFloatArr& from, String* id_var, Distributable* kvStore_var) {
+        DistEffFloatArr(EffFloatArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
-            kvStore->put(0, id->clone()->concat("-chunkSize"), chunkSize);
-            kvStore->put(0, id->clone()->concat("-capacity"), capacity);
-            kvStore->put(0, id->clone()->concat("-currentChunk"), currentChunkIdx);
-            kvStore->put(0, id->clone()->concat("-numElements"), numberOfElements);
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
             for (size_t i = 0; i < capacity; i += 1) {
                 kvStore->put(i % 5, id->clone()->concat("-")->concat(i), from.chunks[i]->clone());
             }
@@ -393,13 +389,13 @@ class DistEffBoolArr : public Object {
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffBoolArr(String* id_var, Distributable* kvStore_var) {
+        DistEffBoolArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = kvStore->get_size_t(0, id->clone()->concat("-chunkSize"));
-            capacity = kvStore->get_size_t(0, id->clone()->concat("-capacity"));
-            currentChunkIdx = kvStore->get_size_t(0, id->clone()->concat("-currentChunk"));
-            numberOfElements = kvStore->get_size_t(0, id->clone()->concat("-numElements"));
+            chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
+            capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
+            currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
+            numberOfElements = kvStore->get_size_t(metadata_node, id->clone()->concat("-numElements"));
         }
 
         /**
@@ -407,17 +403,17 @@ class DistEffBoolArr : public Object {
          *
          * @param from
          */
-        DistEffBoolArr(EffBoolArr& from, String* id_var, Distributable* kvStore_var) {
+        DistEffBoolArr(EffBoolArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
-            kvStore->put(0, id->clone()->concat("-chunkSize"), chunkSize);
-            kvStore->put(0, id->clone()->concat("-capacity"), capacity);
-            kvStore->put(0, id->clone()->concat("-currentChunk"), currentChunkIdx);
-            kvStore->put(0, id->clone()->concat("-numElements"), numberOfElements);
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
             for (size_t i = 0; i < capacity; i += 1) {
                 kvStore->put(i % 5, id->clone()->concat("-")->concat(i), from.chunks[i]->clone());
             }
@@ -470,13 +466,13 @@ class DistEffCharArr : public Object {
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffCharArr(String* id_var, Distributable* kvStore_var) {
+        DistEffCharArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = kvStore->get_size_t(0, id->clone()->concat("-chunkSize"));
-            capacity = kvStore->get_size_t(0, id->clone()->concat("-capacity"));
-            currentChunkIdx = kvStore->get_size_t(0, id->clone()->concat("-currentChunk"));
-            numberOfElements = kvStore->get_size_t(0, id->clone()->concat("-numElements"));
+            chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
+            capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
+            currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
+            numberOfElements = kvStore->get_size_t(metadata_node, id->clone()->concat("-numElements"));
         }
 
         /**
@@ -484,17 +480,17 @@ class DistEffCharArr : public Object {
          *
          * @param from
          */
-        DistEffCharArr(EffCharArr& from, String* id_var, Distributable* kvStore_var) {
+        DistEffCharArr(EffCharArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
-            kvStore->put(0, id->clone()->concat("-chunkSize"), chunkSize);
-            kvStore->put(0, id->clone()->concat("-capacity"), capacity);
-            kvStore->put(0, id->clone()->concat("-currentChunk"), currentChunkIdx);
-            kvStore->put(0, id->clone()->concat("-numElements"), numberOfElements);
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
             for (size_t i = 0; i < capacity; i += 1) {
                 kvStore->put(i % 5, id->clone()->concat("-")->concat(i), from.chunks[i]->clone());
             }
@@ -543,13 +539,13 @@ class DistEffStrArr : public Object {
         String* id;
         Distributable* kvStore;
 
-        DistEffStrArr(String* id_var, Distributable* kvStore_var) {
+        DistEffStrArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
-            chunkSize = kvStore->get_size_t(0, id->clone()->concat("-chunkSize"));
-            capacity = kvStore->get_size_t(0, id->clone()->concat("-capacity"));
-            currentChunkIdx = kvStore->get_size_t(0, id->clone()->concat("-currentChunk"));
-            numberOfElements = kvStore->get_size_t(0, id->clone()->concat("-numElements"));
+            chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
+            capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
+            currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
+            numberOfElements = kvStore->get_size_t(metadata_node, id->clone()->concat("-numElements"));
         }
 
         bool equals(Object* other) {
@@ -564,17 +560,17 @@ class DistEffStrArr : public Object {
             return numberOfElements == o->numberOfElements;
         }
 
-        DistEffStrArr(EffStrArr& from, String* id_var, Distributable* kvStore_var) {
+        DistEffStrArr(EffStrArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
             id = id_var->clone();
             kvStore = kvStore_var;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
-            kvStore->put(0, id->clone()->concat("-chunkSize"), chunkSize);
-            kvStore->put(0, id->clone()->concat("-capacity"), capacity);
-            kvStore->put(0, id->clone()->concat("-currentChunk"), currentChunkIdx);
-            kvStore->put(0, id->clone()->concat("-numElements"), numberOfElements);
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
             for (size_t i = 0; i < capacity; i += 1) {
                 kvStore->put(i % 5, id->clone()->concat("-")->concat(i), from.chunks[i]->clone());
             }

@@ -22,9 +22,11 @@ class NodeInfo : public Object {
         ~NodeInfo() {
             if (send != -1) {
                 close(send);
+                send = -1;
             }
             if (recv != -1) {
                 close(recv);
+                recv = -1;
             }
         }
 };
@@ -35,11 +37,17 @@ class NetworkIP : public Object {
         size_t this_node_;
         int sock_;
         sockaddr_in ip_;
-//        std::mutex mtx;
-//        std::condition_variable cv;
-//        bool ready = false;
-
+        std::mutex* init_sock_lock;
+        std::condition_variable* init_sock_cond;
+        bool init_sock_done = false;
         int num_nodes = 5;
+
+        NetworkIP(std::mutex* mtx, std::condition_variable* cond) {
+            init_sock_lock = mtx;
+            init_sock_cond = cond;
+        }
+
+        NetworkIP() {}
 
         ~NetworkIP() override {
             close(sock_);
@@ -79,20 +87,20 @@ class NetworkIP : public Object {
         }
 
         void server_init(unsigned idx, size_t port) {
-//            std::unique_lock<std::mutex> lck(mtx);
+            std::unique_lock<std::mutex> lck(*init_sock_lock);
             this_node_ = idx;
             init_sock_(port);
-//            ready = true;
-//            lck.unlock();
-//            cv.notify_all();
+            init_sock_done = true;
+            lck.unlock();
+            init_sock_cond->notify_all();
             nodes_ = new NodeInfo[num_nodes];
+            nodes_[0].id = 0;
+            nodes_[0].address = ip_;
             for (size_t i = 2; i <= num_nodes; i += 1) {
                 auto* msg = dynamic_cast<Register*>(recv_first_msg(false));
                 nodes_[msg->sender_].id = msg->sender_;
                 nodes_[msg->sender_].address.sin_family = AF_INET;
                 nodes_[msg->sender_].address.sin_port = htons(msg->port);
-                nodes_[msg->sender_].send = -1;
-                nodes_[msg->sender_].recv = -1;
                 inet_aton(msg->client->c_str(), &(nodes_[msg->sender_].address.sin_addr));
                 delete msg;
             }
@@ -111,8 +119,12 @@ class NetworkIP : public Object {
         }
 
         void client_init(unsigned idx, size_t port, const char* server_adr, unsigned server_port) {
+            std::unique_lock<std::mutex> lck(*init_sock_lock);
             this_node_ = idx;
             init_sock_(port);
+            init_sock_done = true;
+            lck.unlock();
+            init_sock_cond->notify_all();
             nodes_ = new NodeInfo[num_nodes];
             nodes_[0].id = 0;
             nodes_[0].address.sin_family = AF_INET;
@@ -127,15 +139,13 @@ class NetworkIP : public Object {
                 nodes_[i + 1].id = i + 1;
                 nodes_[i + 1].address.sin_family = AF_INET;
                 nodes_[i + 1].address.sin_port = htons(ipd->ports[i]);
-                nodes_[i + 1].send = -1;
-                nodes_[i + 1].recv = -1;
                 inet_aton(ipd->addresses[i]->c_str(), &nodes_[i + 1].address.sin_addr);
             }
             delete ipd;
         }
 
         void shutdown() {
-            auto* kill = new Kill(this_node_, (this_node_ + 1) % num_nodes, 0);
+            auto* kill = new Kill(this_node_, this_node_, 0);
             NodeInfo & tgt = nodes_[kill->target_];
             int conn = socket(AF_INET, SOCK_STREAM, 0);
             assert(conn >= 0 && "Unable to create client socket");
@@ -232,7 +242,7 @@ class NetworkIP : public Object {
             if (req == -1) assert(false && "no established connection");
             size_t size = 0;
             if (read(req, &size, sizeof(size_t)) == 0) {
-                close(req);
+                if (req != -1) close(req);
                 req = -1;
                 return nullptr;
             }

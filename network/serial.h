@@ -65,9 +65,11 @@ class Serializer: public Object {
             curIndex += 1;
         }
 
-        static char* serialize(size_t num, size_t size) {
+        static char* serialize(size_t num, size_t& size) {
             char* buffer = new char[sizeof(num)];
-            serializeInBuffer(buffer, size, num);
+            size_t curIndex = 0;
+            serializeInBuffer(buffer, curIndex, num);
+            size += curIndex;
             return buffer;
         }
 
@@ -144,6 +146,21 @@ class Serializer: public Object {
             serializeInBuffer(buffer, curIndex, arr->numElements());
             for (size_t wordIndex = 0; wordIndex < arr->numElements(); wordIndex += 1) {
                 serializeInBuffer(buffer, curIndex, arr->get(wordIndex));
+            }
+            endIndex += curIndex;
+            return buffer;
+        }
+
+        static char* serialize(FixedCharArray* arr, size_t& endIndex) {
+            size_t bufferSize = 2 * sizeof(size_t);
+            bufferSize += (arr->used) * sizeof(char);
+            size_t curIndex = 0;
+            char* buffer = new char[bufferSize];
+            serializeInBuffer(buffer, curIndex, arr->capacity);
+            serializeInBuffer(buffer, curIndex, arr->used);
+            for (size_t charIndex = 0; charIndex < arr->used; charIndex += 1) {
+                buffer[curIndex] = arr->get(charIndex);
+                curIndex += 1;
             }
             endIndex += curIndex;
             return buffer;
@@ -239,6 +256,18 @@ class Serializer: public Object {
             for (size_t i = 0; i < used; i += 1) {
                 String* curVal = deserializeString(buffer, curIndex);
                 arr->pushBack(curVal);
+            }
+            return arr;
+        }
+
+        static FixedCharArray* deserializeFixedCharArr(const char* buffer, size_t& curIndex) {
+            size_t capacity = deserializeSizeT(buffer, curIndex);
+            size_t used = deserializeSizeT(buffer, curIndex);
+            auto* arr = new FixedCharArray(capacity);
+            for (size_t i = 0; i < used; i += 1) {
+                char curVal = buffer[curIndex];
+                arr->pushBack(curVal);
+                curIndex += 1;
             }
             return arr;
         }
@@ -360,8 +389,12 @@ class Serializer: public Object {
                 serializedChunk = serialize(s->transfer->data->ff, serializedChunkSize);
             } else if(type == 'B') {
                 serializedChunk = serialize(s->transfer->data->fb, serializedChunkSize);
-            } else {
+            } else if (type == 'S'){
                 serializedChunk = serialize(s->transfer->data->fs, serializedChunkSize);
+            } else if (type == 'C') {
+                serializedChunk = serialize(s->transfer->data->fc, serializedChunkSize);
+            } else {
+                assert(false);
             }
             char* buffer = new char[1 + msgAttributesSize + 1 + s->key->size() + 1 + serializedChunkSize];
             size_t curIndex = 0;
@@ -469,7 +502,10 @@ class Serializer: public Object {
             curIndex += 1;
             char* key = deserializeChar(buffer, curIndex);
             Send* send;
-            if (type == 'I') {
+            if (type == 'T') {
+                size_t s = deserializeSizeT(buffer, curIndex);
+                send = new Send(s, key);
+            } else if (type == 'I') {
                 FixedIntArray* arr = deserializeFixedIntArr(buffer, curIndex);
                 send = new Send(arr, key);
             } else if (type == 'F') {
@@ -478,9 +514,14 @@ class Serializer: public Object {
             } else if (type == 'B') {
                 FixedBoolArray* arr = deserializeFixedBoolArr(buffer, curIndex);
                 send = new Send(arr, key);
-            } else {
+            } else if (type == 'S') {
                 FixedStrArray* arr = deserializeFixedStrArr(buffer, curIndex);
                 send = new Send(arr, key);
+            } else if (type == 'C') {
+                FixedCharArray* arr = deserializeFixedCharArr(buffer, curIndex);
+                send = new Send(arr, key);
+            } else {
+                assert(false);
             }
             delete[] key;
             send->sender_ = sender;

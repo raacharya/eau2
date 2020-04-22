@@ -207,11 +207,9 @@ int main(int argc, char** argv) {
         Trivial triv(i, kds[i]);
         triv.run_();
     }
+    delete kds[2];
     for (size_t i = 0; i < 5; i += 1) {
-        kds[i]->kvStore->network->shutdown();
-    }
-    for (size_t i = 0; i < 5; i += 1) {
-        delete kds[i];
+        if (i != 2) delete kds[i];
     }
     delete[] kds;
     std::cout<<"Tests passed\n";

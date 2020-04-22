@@ -271,22 +271,22 @@ class DistDataFrame : public Object {
         String* id;
         Distributable* kvStore;
 
-        DistDataFrame(String* id_var, Distributable* kvStore_var) {
+        DistDataFrame(Key* key, Distributable* kvStore_var) {
             kvStore = kvStore_var;
-            id = id_var->clone();
+            id = key->key->clone();
             id->concat("-df");
-            schema = new DistSchema(id, kvStore);
+            schema = new DistSchema(key, kvStore);
             String* cols_id = id->clone();
             cols_id->concat("-cols");
             columns = new DistEffColArr(schema->types, cols_id, kvStore);
             delete cols_id;
         }
 
-        DistDataFrame(DataFrame &from, String* id_var, Distributable* kvStore_var) {
+        DistDataFrame(DataFrame &from, Key* key, Distributable* kvStore_var) {
             kvStore = kvStore_var;
-            id = id_var->clone();
+            id = key->key->clone();
             id->concat("-df");
-            schema = new DistSchema(*from.schema, id, kvStore);
+            schema = new DistSchema(*from.schema, key, kvStore);
             String* cols_id = id->clone();
             cols_id->concat("-cols");
             columns = new DistEffColArr(*from.columns, cols_id, kvStore);
@@ -373,7 +373,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     DataFrame df(s);
     df.add_column(col, nullptr);
     delete col;
-    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
+    auto* newDf = new DistDataFrame(df, key, kdStore->kvStore);
 
     return newDf;
 }
@@ -387,7 +387,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     DataFrame df(s);
     df.add_column(col, nullptr);
     delete col;
-    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
+    auto* newDf = new DistDataFrame(df, key, kdStore->kvStore);
 
     return newDf;
 }
@@ -409,7 +409,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     DataFrame df(s);
     df.add_column(col, nullptr);
     delete col;
-    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
+    auto* newDf = new DistDataFrame(df, key, kdStore->kvStore);
 
     return newDf;
 }
@@ -431,7 +431,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
     DataFrame df(s);
     df.add_column(col, nullptr);
     delete col;
-    auto* newDf = new DistDataFrame(df, key->key, kdStore->kvStore);
+    auto* newDf = new DistDataFrame(df, key, kdStore->kvStore);
 
     return newDf;
 }
@@ -442,7 +442,7 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
  * @return - DistDatafram associated with the key
  */
 DistDataFrame* KDStore::get(Key& key) {
-    return new DistDataFrame(key.key, kvStore);
+    return new DistDataFrame(&key, kvStore);
 }
 
 /**
@@ -451,7 +451,7 @@ DistDataFrame* KDStore::get(Key& key) {
  * @param df - the Dataframe to base the new DistDataframe off of
  */
 void KDStore::put(Key& key, DataFrame* df) {
-    delete new DistDataFrame(*df, key.key, kvStore);
+    delete new DistDataFrame(*df, &key, kvStore);
 }
 
 /**
@@ -460,5 +460,5 @@ void KDStore::put(Key& key, DataFrame* df) {
  * @return - DistDatafram associated with the key
  */
 DistDataFrame* KDStore::waitAndGet(Key& key) {
-    return new DistDataFrame(key.key, kvStore);
+    return new DistDataFrame(&key, kvStore);
 }

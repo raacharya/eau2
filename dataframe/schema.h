@@ -122,24 +122,24 @@ class DistSchema : public Object {
         Distributable* kvStore;
 
         /** Copying constructor */
-        DistSchema(Schema &from, String* id_var, Distributable* kvStore_var) : Object() {
+        DistSchema(Schema &from, Key* key, Distributable* kvStore_var) : Object() {
             kvStore = kvStore_var;
-            id = id_var->clone();
+            id = key->key->clone();
             id->concat("-schema");
             String* types_id = id->clone();
             types_id->concat("-types");
-            types = new DistEffCharArr(*from.types, types_id, kvStore);
+            types = new DistEffCharArr(*from.types, types_id, kvStore, key->node);
             delete types_id;
         }
 
         /** Create an empty schema **/
-        DistSchema(String* id_var, Distributable* kvStore_var) : Object() {
+        DistSchema(Key* key, Distributable* kvStore_var) : Object() {
             kvStore = kvStore_var;
-            id = id_var->clone();
+            id = key->key->clone();
             id->concat("-schema");
             String* types_id = id->clone();
             types_id->concat("-types");
-            types = new DistEffCharArr(types_id, kvStore);
+            types = new DistEffCharArr(types_id, kvStore, key->node);
             delete types_id;
         }
 
