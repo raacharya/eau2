@@ -314,16 +314,60 @@ class DistDataFrame : public Object {
             return columns->get(col)->as_string()->get(row);
         }
 
+        void fill_rows(Row** rows, DistIntColumn* col, size_t nrow, size_t col_num) {
+            size_t start = 0;
+            size_t end = columns->chunkSize;
+            size_t index = 0;
+
+            while(start != nrow) {
+                FixedIntArray* curr = col->array->get_chunk(index);
+                for(size_t i = start; i < end; i++) {
+                    rows[i]->set(col_num, curr->get(i));
+                }
+
+                start += columns->chunkSize;
+                end += columns->chunkSize;
+            }
+        }
+
+        void fill_rows(Row** rows, DistFloatColumn* col, size_t nrow, size_t col_num) {
+            size_t start = 0;
+            size_t end = columns->chunkSize;
+
+        }
+
+        void fill_rows(Row** rows, DistBoolColumn* col, size_t nrow, size_t col_num) {
+            size_t start = 0;
+            size_t end = columns->chunkSize;
+
+        }
+
+        void fill_rows(Row** rows, DistStringColumn* col, size_t nrow, size_t col_num) {
+            size_t start = 0;
+            size_t end = columns->chunkSize;
+
+        }
+
         /**
          * Read this distributed df with the given reader
          */
         void map(Reader* reader) {
-            size_t r = columns->size();
-            size_t c = schema->types->size();
+            size_t r = columns->get(0)->size();
+            size_t c = columns->size();
+            Row** rows = new Row*[r];
 
-            for(size_t i = 0; i < r; i++) {
-                Row r(*schema);
-                reader->visit(r);
+            for(size_t i = 0; i < c; i++) {
+                DistColumn* dcol = columns->get(i);
+                Column* col = new Column();
+                if(dcol->type == 'I') {
+                    fill_rows(rows, dcol->as_int(), r, i);
+                } else if(dcol->type == 'F') {
+                    fill_rows(rows, dcol->as_float(), r, i);
+                } else if(dcol->type == 'B') {
+                    fill_rows(rows, dcol->as_bool(), r, i);
+                } else {
+                    fill_rows(rows, dcol->as_string(), r, i);
+                }
             }
         }
 

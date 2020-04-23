@@ -29,18 +29,6 @@ class Row : public Object {
             }
         }
 
-        Row(DistSchema &scm) {
-            index = -1;
-            DistEffCharArr dtypes = *scm.types;
-            types = &dtypes.original;
-
-            values = new EffTypeArr();
-            for (int i = 0; i < types->size(); i += 1) {
-                Type *value = new Type;
-                values->pushBack(value);
-            }
-        }
-
         /** Setters: set the given column with the given value. Setting a column with
           * a value of the wrong type throws an error. */
         void set(size_t col, int val) {

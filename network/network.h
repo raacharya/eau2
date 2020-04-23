@@ -306,6 +306,10 @@ class DistEffIntArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
+        FixedIntArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_int_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
+        }
+
         /**
          * @brief get the size of this column
          *
@@ -381,6 +385,10 @@ class DistEffFloatArr : public Object {
             size_t chunkIdx = idx / chunkSize;
             FixedFloatArray* curChunk = kvStore->get_float_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
             return curChunk->get(idx % chunkSize);
+        }
+
+        FixedFloatArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_float_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
         }
 
         /**
@@ -460,6 +468,10 @@ class DistEffBoolArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
+        FixedBoolArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_bool_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
+        }
+
         /**
          * @brief get the size of this column
          *
@@ -490,8 +502,6 @@ class DistEffCharArr : public Object {
         size_t numberOfElements;
         String* id;
         Distributable* kvStore;
-        //CHANGE
-        EffCharArr original;
 
         /**
          * @brief Construct a new Eff Col Arr object
@@ -525,7 +535,6 @@ class DistEffCharArr : public Object {
             for (size_t i = 0; i < capacity; i += 1) {
                 kvStore->put(i % 5, id->clone()->concat("-")->concat(i), from.chunks[i]->clone());
             }
-            original = from;
         }
 
         /**
@@ -538,6 +547,10 @@ class DistEffCharArr : public Object {
             size_t chunkIdx = idx / chunkSize;
             FixedCharArray* curChunk = kvStore->get_char_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
             return curChunk->get(idx % chunkSize);
+        }
+
+        FixedStrArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_str_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
         }
 
         /**
