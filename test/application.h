@@ -47,20 +47,6 @@ class Trivial : public Application {
         }
 };
 
-class Writer {
-
-    virtual void visit(Row& r);
-
-    virtual bool done();
-};
-
-class Reader {
-
-    virtual bool visit(Row& r);
-
-    virtual bool done();
-};
-
 class FileReader : public Writer {
 
     public:
@@ -140,7 +126,6 @@ class FileReader : public Writer {
         FILE * file_;
 };
 
-
 /****************************************************************************/
 class Adder : public Reader {
     public:
@@ -151,13 +136,14 @@ class Adder : public Reader {
             map_ = *map;
         }
 
-        bool visit(Row& r) override {
+        bool visit(Row& r) {
             String* word = r.get_string(0);
             assert(word != nullptr);
             size_t num = (map_.find(std::string(word->c_str())) != map_.end()) ?
                     map_[std::string(word->c_str())] : 0;
             map_[std::string(word->c_str())] = num + 1;
-            return false;
+            //changed this to true
+            return true;
         }
 };
 
@@ -217,7 +203,7 @@ public:
     void run_() override {
         if (index == 0) {
             FileReader fr{"filename"};
-//            delete DataFrame::fromVisitor(&in, &kv, "S", fr);
+            delete DistDataFrame::fromVisitor(&in, kd->kvStore, "SI", &fr);
         }
         local_count();
 //        reduce();
@@ -231,7 +217,7 @@ public:
         // local map
         delete words;
         Summer cnt(&map);
-        // from visitor
+        words->fromVisitor(&in, kd->kvStore, "SI", &cnt);
     }
 
     /** Merge the data frames of all nodes */
@@ -252,11 +238,12 @@ public:
         }
         delete key;
         delete own;
+        std::cout << &map;
     }
 
     void merge(DistDataFrame* df, std::map<std::string, size_t>* m) {
         Adder add(m);
-        //df->map(add);
+        df->map(&add);
         delete df;
     }
 }; // WordcountDemo

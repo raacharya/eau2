@@ -314,6 +314,19 @@ class DistDataFrame : public Object {
             return columns->get(col)->as_string()->get(row);
         }
 
+        /**
+         * Read this distributed df with the given reader
+         */
+        void map(Reader* reader) {
+            size_t r = columns->size();
+            size_t c = schema->types->size();
+
+            for(size_t i = 0; i < r; i++) {
+                Row r(*schema);
+                reader->visit(r);
+            }
+        }
+
 
         /**
          * @brief Destroy the Data Frame object
@@ -332,6 +345,8 @@ class DistDataFrame : public Object {
         static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, String **vals);
 
         static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, int *vals);
+
+        static DistDataFrame *fromVisitor(Key* key, Distributable* kvstore, const char* schema, Writer* r);
 };
 
 class KDStore : public Object {
@@ -465,4 +480,20 @@ DistDataFrame* KDStore::waitAndGet(Key& key) {
         kvStore->complete_df_cond.wait(df_lock);
     df_lock.unlock();
     return new DistDataFrame(&key, kvStore);
+}
+
+/**
+ * Create a DistDataFrame from the given writer
+ */
+DistDataFrame *fromVisitor(Key* key, Distributable* kvstore, const char* type, Writer* r) {
+    Schema schema(type);
+    DataFrame newDf(schema);
+
+    while(!r->done()) {
+        Row row(schema);
+        r->visit(row);
+        newDf.add_row(row);
+    }
+
+    return new DistDataFrame(newDf, key, kvstore);
 }

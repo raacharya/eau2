@@ -214,3 +214,20 @@ class MultiRower : public Rower {
             return new AddOneRower();
         }
 };
+
+class Writer: public Rower {
+
+public:
+
+    virtual void visit(Row& r);
+
+    virtual bool done();
+};
+
+class Reader: public Rower  {
+public:
+
+    virtual bool visit(Row& r);
+
+    virtual bool done();
+};

@@ -490,6 +490,8 @@ class DistEffCharArr : public Object {
         size_t numberOfElements;
         String* id;
         Distributable* kvStore;
+        //CHANGE
+        EffCharArr original;
 
         /**
          * @brief Construct a new Eff Col Arr object
@@ -523,6 +525,7 @@ class DistEffCharArr : public Object {
             for (size_t i = 0; i < capacity; i += 1) {
                 kvStore->put(i % 5, id->clone()->concat("-")->concat(i), from.chunks[i]->clone());
             }
+            original = from;
         }
 
         /**
