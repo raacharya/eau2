@@ -2,6 +2,7 @@
 
 #include "../dataframe/dataframe.h"
 #include "../network/network.h"
+#include "../util/helper.h"
 
 class Application {
     public:
@@ -94,9 +95,9 @@ class FileReader : public Writer {
         bool done() override { return (i_ >= end_) && feof(file_);  }
 
         /** Creates the reader and opens the file for reading.  */
-        FileReader( const char* filename) {
+        explicit FileReader( const char* filename) {
             file_ = fopen(filename, "r");
-            if (file_ == nullptr) FATAL_ERROR("Cannot open file");
+            if (file_ == nullptr) assert(false);
             buf_ = new char[BUFSIZE + 1]; //  null terminator
             fillBuffer_();
             skipWhitespace_();
@@ -139,32 +140,23 @@ class FileReader : public Writer {
         FILE * file_;
 };
 
-class Num {
-    public:
-        int val;
-
-        Num() {
-            val = 0;
-        }
-};
-
 
 /****************************************************************************/
 class Adder : public Reader {
     public:
 
-        std::map<std::string, int> map_;  // String to Num map;  Num holds an int
+        std::map<std::string, size_t> map_;  // String to Num map;  Num holds an int
 
-        Adder() {}
+        explicit Adder(std::map<std::string, size_t>* map) {
+            map_ = *map;
+        }
 
         bool visit(Row& r) override {
             String* word = r.get_string(0);
             assert(word != nullptr);
-            int num = (map_.find(word->c_str()) != map_.end()) ? map_.at(word->c_str()) : -1;
-            assert(num >= 0);
-            num++;
-            //unsure
-            map_.at(word->c_str()) = num;
+            size_t num = (map_.find(std::string(word->c_str())) != map_.end()) ?
+                    map_[std::string(word->c_str())] : 0;
+            map_[std::string(word->c_str())] = num + 1;
             return false;
         }
 };
@@ -172,58 +164,39 @@ class Adder : public Reader {
 /***************************************************************************/
 class Summer : public Writer {
     public:
-        SIMap& map_;
-        size_t i = 0;
-        size_t j = 0;
-        size_t seen = 0;
+        std::map<std::string, size_t>::iterator itr;
+        std::map<std::string, size_t>::iterator end;
 
-        Summer(SIMap& map) : map_(map) {
-            if (!k()) {
-                next();
-            }
+        explicit Summer(std::map<std::string, size_t>* map) {
+            itr = map->begin();
+            end = map->end();
         }
 
         void next() {
             assert(!done());
-            if (i == map_.capacity_ ) return;
-            j++;
-            ++seen;
-            if ( j >= map_.items_[i].keys_.length() ) {
-                ++i;
-                j = 0;
-                while( i < map_.capacity_ && map_.items_[i].keys_.length() == 0 ) {
-                    i++;
-                }
-            }
+            itr++;
         }
 
-        String* k() {
-            if (i==map_.capacity_ || j == map_.items_[i].keys_.length()) {
-                return nullptr;
-            }
-            return (String*) (map_.items_[i].keys_.get(j));
+        const char* k() const {
+            return itr->first.c_str();
         }
 
-        size_t v() {
-            if (i == map_.capacity_ || j == map_.items_[i].keys_.length()) {
-                assert(false); return 0;
-            }
-            return ((Num*)(map_.items_[i].vals_.get(j)))->v;
+        int v() const {
+            return itr->second;
         }
 
-        void visit(Row& r) {
-            String & key = *k();
+        void visit(Row& r) override {
+            const char* key = k();
+            auto* str = new String(key);
             size_t value = v();
-            r.set(0, &key);
+            r.set(0, str);
             r.set(1, (int) value);
             next();
         }
 
-        bool done() {
-            return seen == map_.size();
+        bool done() override {
+            return itr == end;
         }
-    };
-
 };
 
 /****************************************************************************
@@ -236,61 +209,54 @@ class WordCount: public Application {
 public:
     static const size_t BUFSIZE = 1024;
     Key in;
-    KeyBuff kbuf;
-    SIMap all;
 
-    WordCount(size_t idx, NetworkIfc & net):
-            Application(idx, net), in("data"), kbuf(new Key("wc-map-",0)) { }
+    WordCount(size_t idx, KDStore* net):
+            Application(idx, net), in("data", 0) {}
 
     /** The master nodes reads the input, then all of the nodes count. */
     void run_() override {
         if (index == 0) {
-            FileReader fr;
-            delete DataFrame::fromVisitor(&in, &kv, "S", fr);
+            FileReader fr{"filename"};
+//            delete DataFrame::fromVisitor(&in, &kv, "S", fr);
         }
         local_count();
-        reduce();
-    }
-
-    /** Returns a key for given node.  These keys are homed on master node
-     *  which then joins them one by one. */
-    Key* mk_key(size_t idx) {
-        Key * k = kbuf.c(idx).get();
-        LOG("Created key " << k->c_str());
-        return k;
+//        reduce();
     }
 
     /** Compute word counts on the local node and build a data frame. */
     void local_count() {
-        DataFrame* words = (kv.waitAndGet(in));
-        p("Node ").p(index).pln(": starting local count...");
-        SIMap map;
-        Adder add(map);
-        words->local_map(add);
+        DistDataFrame* words = kd->waitAndGet(in);
+        std::map<std::string, size_t> map;
+        Adder add(&map);
+        // local map
         delete words;
-        Summer cnt(map);
-        delete DataFrame::fromVisitor(mk_key(index), &kv, "SI", cnt);
+        Summer cnt(&map);
+        // from visitor
     }
 
     /** Merge the data frames of all nodes */
     void reduce() {
         if (index != 0) return;
-        pln("Node 0: reducing counts...");
-        SIMap map;
-        Key* own = mk_key(0);
-        merge(kv.get(*own), map);
-        for (size_t i = 1; i < arg.num_nodes; ++i) { // merge other nodes
-            Key* ok = mk_key(i);
-            merge(kv.waitAndGet(*ok), map);
+        std::map<std::string, size_t> map;
+        auto* key = new String("wc-map-");
+        String* ownStr = key->clone()->concat((size_t)0);
+        Key* own = new Key(ownStr->c_str(), 0);
+        delete ownStr;
+        merge(kd->get(*own), &map);
+        for (size_t i = 1; i < 5; ++i) { // merge other nodes
+            String* okStr = key->clone()->concat(i);
+            Key* ok = new Key(okStr->c_str(), i);
+            delete okStr;
+            merge(kd->waitAndGet(*ok), &map);
             delete ok;
         }
-        p("Different words: ").pln(map.size());
+        delete key;
         delete own;
     }
 
-    void merge(DataFrame* df, SIMap& m) {
+    void merge(DistDataFrame* df, std::map<std::string, size_t>* m) {
         Adder add(m);
-        df->map(add);
+        //df->map(add);
         delete df;
     }
 }; // WordcountDemo
