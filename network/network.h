@@ -259,18 +259,13 @@ class Distributable : public Object {
         }
 
         ~Distributable() {
-            std::cout<<"deleting\n";
             for (std::map<std::string, Transfer*>::iterator itr = kvStore.begin(); itr != kvStore.end(); itr++) {
                 delete (itr->second);
             }
-            std::cout<<"shutdown\n";
             if (accept_conn_pid.joinable()) accept_conn_pid.join();
-            std::cout<<"start\n";
             delete network;
-            std::cout<<"network\n";
             for (size_t i = 0; i < 5; i += 1) {
                 if (individual_conns[i].joinable()) individual_conns[i].join();
-                std::cout<<i<<"\n";
             }
             delete[] individual_conns;
         }

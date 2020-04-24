@@ -3,10 +3,10 @@
 #include "../dataframe/dataframe.h"
 #include "application.h"
 #include <stdio.h>
-#include "../network/network_ip.h"
 
 /**
- * Ensures that the serializer correctly serializes and deserializes a message
+ * The first four tests test functionality of serializing
+ * and deserializing different types of messages.
  */
 void testMessageDirectory() {
     size_t sender = 90;
@@ -45,12 +45,8 @@ void testMessageDirectory() {
     delete m;
     delete[] serializedMessage;
     delete deserializedMessage;
-    std::cout << "works for directory" << "\n";
 }
 
-/**
- * Ensures that the serializer correctly serializes and deserializes a message
- */
 void testMessageGet() {
     size_t sender = 90;
     size_t target = 91;
@@ -72,7 +68,6 @@ void testMessageGet() {
     delete[] serializedMessage;
     delete get;
     delete g;
-    std::cout << "works for get" << "\n";
 }
 
 void testMessageSend() {
@@ -106,12 +101,8 @@ void testMessageSend() {
     delete send;
     delete s->transfer;
     delete s;
-    std::cout << "works for send" << "\n";
 }
 
-/**
- * Ensures that the serializer correctly serializes and deserializes a message
- */
 void testMessageRegister() {
     size_t sender = 90;
     size_t id = 92;
@@ -130,26 +121,48 @@ void testMessageRegister() {
     delete[] serializedMessage;
     delete deserializedMessage;
     delete m;
-    std::cout << "works for registry" << "\n";
 }
 
 /**
- * Runs our use cases
- * @param argc
- * @param argv
- * @return
+ * The next test tests the Trivial application.
  */
-int main(int argc, char** argv) {
-    testMessageDirectory();
-    testMessageGet();
-    testMessageSend();
-    testMessageRegister();
+void testTrivial() {
+    auto** kds = new KDStore*[5];
+    auto* pids = new std::thread[5];
+    auto** wcs = new Trivial*[5];
+    for (size_t i = 0; i < 5; i += 1) {
+        kds[i] = new KDStore(i);
+        wcs[i] = new Trivial(i, kds[i]);
+    }
+    for (size_t i = 0; i < 5; i += 1) {
+        pids[i] = std::thread(&Trivial::run_, wcs[i]);
+    }
+    for (size_t i = 0; i < 5; i += 1) {
+        pids[i].join();
+    }
+    for (size_t i = 0; i < 5; i += 1) {
+        kds[i]->kvStore->network->shutdown();
+        kds[i]->kvStore->network->shutdown_open_conns();
+    }
+    for (size_t i = 0; i < 5; i += 1) {
+        delete wcs[i];
+        delete kds[i];
+    }
+    delete[] wcs;
+    delete[] kds;
+    delete[] pids;
+}
+
+/**
+ * The next test tests the WordCount application.
+ */
+void testWordCount() {
     auto** kds = new KDStore*[5];
     auto* pids = new std::thread[5];
     auto** wcs = new WordCount*[5];
     for (size_t i = 0; i < 5; i += 1) {
         kds[i] = new KDStore(i);
-        wcs[i] = new WordCount(i, kds[i]);
+        wcs[i] = new WordCount(i, kds[i], "100k.txt");
     }
     for (size_t i = 0; i < 5; i += 1) {
         pids[i] = std::thread(&WordCount::run_, wcs[i]);
@@ -168,6 +181,15 @@ int main(int argc, char** argv) {
     delete[] wcs;
     delete[] kds;
     delete[] pids;
+}
+
+int main(int argc, char** argv) {
+    testMessageDirectory();
+    testMessageGet();
+    testMessageSend();
+    testMessageRegister();
+    testTrivial();
+    testWordCount();
     std::cout<<"Tests passed\n";
     return 0;
 }
