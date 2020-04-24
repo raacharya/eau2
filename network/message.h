@@ -122,6 +122,7 @@ class Get : public Message {
 
 union Data {
     size_t st;
+    bool b;
     FixedIntArray* fi;
     FixedFloatArray* ff;
     FixedBoolArray* fb;
@@ -170,6 +171,12 @@ class Transfer : public Object {
             data->fc = var;
         }
 
+        Transfer(bool var) {
+            type = 'U';
+            data = new Data();
+            data->b = var;
+        }
+
         ~Transfer() {
             if (type == 'I') {
                 delete data->fi;
@@ -188,6 +195,11 @@ class Transfer : public Object {
         size_t s_t() {
             assert(type == 'T');
             return data->st;
+        }
+
+        bool b() {
+            assert(type == 'U');
+            return data->b;
         }
 
         FixedIntArray* int_chunk() {
@@ -257,6 +269,13 @@ class Send : public Message {
         }
 
         Send(FixedCharArray* var, const char* key_) {
+            kind_ = MsgKind::Send;
+            key = new String(key_);
+            transfer = new Transfer(var);
+            id_ = 0;
+        }
+
+        Send(bool var, const char* key_) {
             kind_ = MsgKind::Send;
             key = new String(key_);
             transfer = new Transfer(var);

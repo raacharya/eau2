@@ -128,7 +128,7 @@ class DistSchema : public Object {
             id->concat("-schema");
             String* types_id = id->clone();
             types_id->concat("-types");
-            types = new DistEffCharArr(*from.types, types_id, kvStore, key->node);
+            types = new DistEffCharArr(*from.types, types_id, kvStore, key->node, false);
             delete types_id;
         }
 
@@ -139,14 +139,21 @@ class DistSchema : public Object {
             id->concat("-schema");
             String* types_id = id->clone();
             types_id->concat("-types");
-            types = new DistEffCharArr(types_id, kvStore, key->node);
+            types = new DistEffCharArr(types_id, kvStore, key->node, true);
             delete types_id;
         }
 
         /** Return type of column at idx. An idx >= width is undefined. */
         char col_type(size_t idx) {
             return types->get(idx);
+        }
 
+        void add_column(char type) {
+            types->push_back(type);
+        }
+
+        void lock() {
+            types->lock();
         }
 
         ~DistSchema() {

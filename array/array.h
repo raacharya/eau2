@@ -676,7 +676,7 @@ class FixedStrArray : public Object {
 		 * @param item the given item to be added to the end of this array
 		 */
 		virtual void pushBack(String* item) {
-			array->pushBack(item);
+			array->pushBack(item->clone());
 		}
 
 		/**
@@ -717,15 +717,13 @@ class FixedStrArray : public Object {
 			return array->indexOf(item);
 		}
 
-        void removeAndSwitch(int index) {
-            array->removeAndSwitch(index);
-        }
-
-
 		/**
 		 * Destructor of this class.
 		 */
 		~FixedStrArray() {
+		    for (size_t i = 0; i < array->used; i += 1) {
+		        delete array->get(i);
+		    }
 			delete array;
 		}
 };

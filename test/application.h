@@ -25,23 +25,29 @@ class Trivial : public Application {
         void run_() override {
             if (index == 2) {
                 size_t SZ = 1000 * 1;
-                auto *vals = new float[SZ];
+                auto** vals = new String*[SZ];
                 double sum = 0;
                 for (size_t i = 0; i < SZ; ++i) {
-                    vals[i] = i;
+                    auto* str = new String("hello");
+                    vals[i] = str;
                     sum += i;
                 }
                 Key key("triv", 0);
                 DistDataFrame *df = DistDataFrame::fromArray(&key, kd, SZ, vals);
-                assert(df->get_float(0, 1) == 1);
+                auto* str = new String("hello");
+                assert(df->get_string(0, 1)->equals(str));
                 DistDataFrame *df2 = kd->get(key);
                 for (size_t i = 0; i < SZ; ++i) {
-                    float cur = df2->get_float(0, i);
-                    sum -= cur;
+                    assert(df->get_string(0, i)->equals(str));
+                    sum -= i;
                 }
                 assert(sum == 0);
+                delete str;
                 delete df;
                 delete df2;
+                for (size_t i = 0; i < SZ; ++i) {
+                    delete vals[i];
+                }
                 delete[] vals;
             }
         }
@@ -206,7 +212,7 @@ public:
             delete DistDataFrame::fromVisitor(&in, kd->kvStore, "SI", &fr);
         }
         local_count();
-//        reduce();
+        reduce();
     }
 
     /** Compute word counts on the local node and build a data frame. */
@@ -214,10 +220,10 @@ public:
         DistDataFrame* words = kd->waitAndGet(in);
         std::map<std::string, size_t> map;
         Adder add(&map);
-        // local map
+        // local map TODO
         delete words;
         Summer cnt(&map);
-        words->fromVisitor(&in, kd->kvStore, "SI", &cnt);
+        delete DistDataFrame::fromVisitor(&in, kd->kvStore, "SI", &cnt);
     }
 
     /** Merge the data frames of all nodes */
@@ -241,7 +247,7 @@ public:
         std::cout << &map;
     }
 
-    void merge(DistDataFrame* df, std::map<std::string, size_t>* m) {
+    static void merge(DistDataFrame* df, std::map<std::string, size_t>* m) {
         Adder add(m);
         df->map(&add);
         delete df;

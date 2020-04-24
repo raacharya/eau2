@@ -270,6 +270,18 @@ class DistDataFrame : public Object {
         DistEffColArr *columns;
         String* id;
         Distributable* kvStore;
+        bool locked_;
+
+        DistDataFrame(Schema& schema_var, Key* key, Distributable* kvStore_var) {
+            id = key->key->clone()->concat("-df");
+            kvStore = kvStore_var;
+            schema = new DistSchema(schema_var, key, kvStore);
+            String* cols_id = id->clone();
+            cols_id->concat("-cols");
+            columns = new DistEffColArr(schema->types, cols_id, kvStore, key->node, false);
+            delete cols_id;
+            locked_ = false;
+        }
 
         DistDataFrame(Key* key, Distributable* kvStore_var) {
             kvStore = kvStore_var;
@@ -278,8 +290,9 @@ class DistDataFrame : public Object {
             schema = new DistSchema(key, kvStore);
             String* cols_id = id->clone();
             cols_id->concat("-cols");
-            columns = new DistEffColArr(schema->types, cols_id, kvStore);
+            columns = new DistEffColArr(schema->types, cols_id, kvStore, key->node, true);
             delete cols_id;
+            locked_ = true;
         }
 
         DistDataFrame(DataFrame &from, Key* key, Distributable* kvStore_var) {
@@ -291,42 +304,8 @@ class DistDataFrame : public Object {
             cols_id->concat("-cols");
             columns = new DistEffColArr(*from.columns, cols_id, kvStore);
             delete cols_id;
+            locked_ = true;
         }
-
-        /** Return the value at the given column and row. Accessing rows or
-         *  columns out of bounds, or request the wrong type throws an error.*/
-        int get_int(size_t col, size_t row) {
-            assert(columns->get(col)->get_type() == 'I');
-            return columns->get(col)->as_int()->get(row);
-        }
-        bool get_bool(size_t col, size_t row) {
-            assert(columns->get(col)->get_type() == 'B');
-            return columns->get(col)->as_bool()->get(row);
-        }
-
-        float get_float(size_t col, size_t row) {
-            assert(columns->get(col)->get_type() == 'F');
-            return columns->get(col)->as_float()->get(row);
-        }
-
-        String *get_string(size_t col, size_t row) {
-            assert(columns->get(col)->get_type() == 'S');
-            return columns->get(col)->as_string()->get(row);
-        }
-
-        /**
-         * Read this distributed df with the given reader
-         */
-        void map(Reader* reader) {
-            size_t r = columns->size();
-            size_t c = schema->types->size();
-
-            for(size_t i = 0; i < r; i++) {
-                Row r(*schema);
-                reader->visit(r);
-            }
-        }
-
 
         /**
          * @brief Destroy the Data Frame object
@@ -336,6 +315,124 @@ class DistDataFrame : public Object {
             delete columns;
             delete schema;
             delete id;
+        }
+
+        /** Return the value at the given column and row. Accessing rows or
+         *  columns out of bounds, or request the wrong type throws an error.*/
+        int get_int(size_t col, size_t row) {
+            return columns->get(col)->as_int()->get(row);
+        }
+        bool get_bool(size_t col, size_t row) {
+            return columns->get(col)->as_bool()->get(row);
+        }
+
+        float get_float(size_t col, size_t row) {
+            return columns->get(col)->as_float()->get(row);
+        }
+
+        String *get_string(size_t col, size_t row) {
+            return columns->get(col)->as_string()->get(row);
+        }
+
+        void add_column(DistColumn* col) {
+            assert(!locked_);
+            schema->add_column(col->get_type());
+            columns->push_back(col);
+        }
+
+        void add_row(Row* row) {
+
+        }
+
+        void lock() {
+            locked_ = true;
+            columns->lock();
+            schema->lock();
+        }
+
+        void fill_rows(Row** rows, DistIntColumn* col, size_t nrow, size_t col_num) {
+            size_t start = 0;
+            size_t index = 0;
+
+            while(start < nrow) {
+                FixedIntArray* curr = col->array->get_chunk(index);
+                for(size_t i = start; i < start + curr->used; i++) {
+                    rows[i]->set(col_num, curr->get(i));
+                }
+
+                start += columns->chunkSize;
+            }
+        }
+
+        void fill_rows(Row** rows, DistFloatColumn* col, size_t nrow, size_t col_num) {
+            size_t start = 0;
+            size_t index = 0;
+
+            while(start != nrow) {
+                FixedFloatArray* curr = col->array->get_chunk(index);
+                for(size_t i = start; i < start + curr->used; i++) {
+                    rows[i]->set(col_num, curr->get(i));
+                }
+
+                start += columns->chunkSize;
+            }
+
+        }
+
+        void fill_rows(Row** rows, DistBoolColumn* col, size_t nrow, size_t col_num) {
+            size_t start = 0;
+            size_t end = columns->chunkSize;
+            size_t index = 0;
+
+            while(start != nrow) {
+                FixedBoolArray* curr = col->array->get_chunk(index);
+                for(size_t i = start; i < start + curr->used; i++) {
+                    rows[i]->set(col_num, curr->get(i));
+                }
+
+                start += columns->chunkSize;
+            }
+
+        }
+
+        void fill_rows(Row** rows, DistStringColumn* col, size_t nrow, size_t col_num) {
+            size_t start = 0;
+            size_t index = 0;
+
+            while(start != nrow) {
+                FixedStrArray* curr = col->array->get_chunk(index);
+                for(size_t i = start; i < start + curr->numElements(); i++) {
+                    rows[i]->set(col_num, curr->get(i));
+                }
+
+                start += columns->chunkSize;
+            }
+        }
+
+        /**
+         * Read this distributed df with the given reader
+         */
+        void map(Reader* reader) {
+            size_t r = columns->get(0)->size();
+            size_t c = columns->size();
+            Row** rows = new Row*[r];
+
+            for(size_t i = 0; i < c; i++) {
+                DistColumn* dcol = columns->get(i);
+                if(dcol->get_type() == 'I') {
+                    fill_rows(rows, dcol->as_int(), r, i);
+                } else if(dcol->get_type() == 'F') {
+                    fill_rows(rows, dcol->as_float(), r, i);
+                } else if(dcol->get_type() == 'B') {
+                    fill_rows(rows, dcol->as_bool(), r, i);
+                } else {
+                    fill_rows(rows, dcol->as_string(), r, i);
+                }
+            }
+
+            for(size_t i = 0; i < r; i++) {
+                reader->visit(*rows[i]);
+            }
         }
 
         static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, bool *vals);
@@ -380,31 +477,33 @@ class KDStore : public Object {
  * @return
  */
 DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, int* vals) {
-    auto* col = new IntColumn();
+    Schema s{};
+    auto* ddf = new DistDataFrame(s, key, kdStore->kvStore);
+    String* col_id = key->key->clone()->concat("-df-cols-0-0");
+    auto* col = new DistIntColumn(col_id, kdStore->kvStore, key->node, false);
+    delete col_id;
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
-    Schema s{};
-    DataFrame df(s);
-    df.add_column(col, nullptr);
-    delete col;
-    auto* newDf = new DistDataFrame(df, key, kdStore->kvStore);
-
-    return newDf;
+    ddf->add_column(col);
+    ddf->lock();
+    kdStore->kvStore->send_finished_update(key->key->c_str());
+    return ddf;
 }
 
 DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, float* vals) {
-    auto* col = new FloatColumn();
+    Schema s{};
+    auto* ddf = new DistDataFrame(s, key, kdStore->kvStore);
+    String* col_id = key->key->clone()->concat("-df-cols-0-0");
+    auto* col = new DistFloatColumn(col_id, kdStore->kvStore, key->node, false);
+    delete col_id;
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
-    Schema s{};
-    DataFrame df(s);
-    df.add_column(col, nullptr);
-    delete col;
-    auto* newDf = new DistDataFrame(df, key, kdStore->kvStore);
+    ddf->add_column(col);
+    ddf->lock();
     kdStore->kvStore->send_finished_update(key->key->c_str());
-    return newDf;
+    return ddf;
 }
 
 /**
@@ -416,17 +515,18 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
  * @return
  */
 DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, bool* vals) {
-    auto* col = new BoolColumn();
+    Schema s{};
+    auto* ddf = new DistDataFrame(s, key, kdStore->kvStore);
+    String* col_id = key->key->clone()->concat("-df-cols-0-0");
+    auto* col = new DistBoolColumn(col_id, kdStore->kvStore, key->node, false);
+    delete col_id;
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
-    Schema s{};
-    DataFrame df(s);
-    df.add_column(col, nullptr);
-    delete col;
-    auto* newDf = new DistDataFrame(df, key, kdStore->kvStore);
-
-    return newDf;
+    ddf->add_column(col);
+    ddf->lock();
+    kdStore->kvStore->send_finished_update(key->key->c_str());
+    return ddf;
 }
 
 /**
@@ -438,17 +538,18 @@ DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size,
  * @return
  */
 DistDataFrame* DistDataFrame::fromArray(Key* key, KDStore* kdStore, size_t size, String** vals) {
-    auto* col = new StringColumn();
+    Schema s{};
+    auto* ddf = new DistDataFrame(s, key, kdStore->kvStore);
+    String* col_id = key->key->clone()->concat("-df-cols-0-0");
+    auto* col = new DistStringColumn(col_id, kdStore->kvStore, key->node, false);
+    delete col_id;
     for(size_t i = 0; i < size; i++) {
         col->push_back(vals[i]);
     }
-    Schema s{};
-    DataFrame df(s);
-    df.add_column(col, nullptr);
-    delete col;
-    auto* newDf = new DistDataFrame(df, key, kdStore->kvStore);
-
-    return newDf;
+    ddf->add_column(col);
+    ddf->lock();
+    kdStore->kvStore->send_finished_update(key->key->c_str());
+    return ddf;
 }
 
 /**

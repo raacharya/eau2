@@ -109,10 +109,13 @@ class Distributable : public Object {
                     send->sender_ = get->target_;
                     send->id_ = get->id_;
                     network->send_reply(send, true);
-                    delete msg;
+                    delete get;
                     delete send;
                 } else if (msg->kind_ == MsgKind::Send) {
                     Send* send = dynamic_cast<Send*>(msg);
+                    if (kvStore.find(std::string(send->key->c_str())) != kvStore.end()) {
+
+                    }
                     kvStore[std::string(send->key->c_str())] = send->transfer;
                     delete send;
                 } else if (msg->kind_ == MsgKind::Finished) {
@@ -132,11 +135,16 @@ class Distributable : public Object {
                 if (index != i) {
                     Finished* finished = new Finished(index, i, 0, key);
                     network->send_msg(finished, true);
+                    delete finished;
                 }
             }
         }
 
         void put(size_t node, String* key, size_t val) {
+            put_(node, key, new Transfer(val));
+        }
+
+        void put(size_t node, String* key, bool val) {
             put_(node, key, new Transfer(val));
         }
 
@@ -180,6 +188,11 @@ class Distributable : public Object {
         size_t get_size_t(size_t node, String* key) {
             Transfer* transfer = get_(node, 'T', key);
             return transfer->s_t();
+        }
+
+        bool get_bool(size_t node, String* key) {
+            Transfer* transfer = get_(node, 'U', key);
+            return transfer->b();
         }
 
         FixedIntArray* get_int_chunk(size_t node, String* key) {
@@ -259,14 +272,28 @@ class DistEffIntArr : public Object {
         size_t numberOfElements;
         String* id;
         Distributable* kvStore;
+        size_t metadata_node;
+        FixedIntArray* current_chunk;
+
+        DistEffIntArr(String* id_var, Distributable* kvStore_var, size_t node, bool get) {
+            id = id_var->clone();
+            kvStore = kvStore_var;
+            metadata_node = node;
+            chunkSize = get ? kvStore->get_size_t(node, id->clone()->concat("-chunkSize")) : 50;
+            capacity = get ? kvStore->get_size_t(node, id->clone()->concat("-capacity")) : 1;
+            currentChunkIdx = get ? kvStore->get_size_t(node, id->clone()->concat("-currentChunk")) : 0;
+            numberOfElements = get ? kvStore->get_size_t(node, id->clone()->concat("-numElements")) : 0;
+            current_chunk = get ? nullptr : new FixedIntArray(chunkSize);
+        }
 
         /**
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffIntArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffIntArr(String* id_var, Distributable* kvStore_var, size_t node) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
             capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
             currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
@@ -278,9 +305,10 @@ class DistEffIntArr : public Object {
          *
          * @param from
          */
-        DistEffIntArr(EffIntArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffIntArr(EffIntArr& from, String* id_var, Distributable* kvStore_var, size_t node) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
@@ -306,13 +334,26 @@ class DistEffIntArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
-        /**
-         * @brief get the size of this column
-         *
-         * @return size_t
-         */
-        size_t size() {
-            return numberOfElements;
+        void push_back(int val) {
+            assert(current_chunk != nullptr);
+            current_chunk->pushBack(val);
+            if (current_chunk->capacity == current_chunk->used) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+                currentChunkIdx += 1;
+                current_chunk = new FixedIntArray(chunkSize);
+            }
+        }
+
+        void lock() {
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
+            if (current_chunk->used > 0) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+            } else {
+                delete current_chunk;
+            }
         }
 
         /**
@@ -336,14 +377,28 @@ class DistEffFloatArr : public Object {
         size_t numberOfElements;
         String* id;
         Distributable* kvStore;
+        size_t metadata_node;
+        FixedFloatArray* current_chunk;
+
+        DistEffFloatArr(String* id_var, Distributable* kvStore_var, size_t node, bool get) {
+            id = id_var->clone();
+            kvStore = kvStore_var;
+            metadata_node = node;
+            chunkSize = get ? kvStore->get_size_t(node, id->clone()->concat("-chunkSize")) : 50;
+            capacity = get ? kvStore->get_size_t(node, id->clone()->concat("-capacity")) : 1;
+            currentChunkIdx = get ? kvStore->get_size_t(node, id->clone()->concat("-currentChunk")) : 0;
+            numberOfElements = get ? kvStore->get_size_t(node, id->clone()->concat("-numElements")) : 0;
+            current_chunk = get ? nullptr : new FixedFloatArray(chunkSize);
+        }
 
         /**
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffFloatArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffFloatArr(String* id_var, Distributable* kvStore_var, size_t node) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
             capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
             currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
@@ -355,9 +410,10 @@ class DistEffFloatArr : public Object {
          *
          * @param from
          */
-        DistEffFloatArr(EffFloatArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffFloatArr(EffFloatArr& from, String* id_var, Distributable* kvStore_var, size_t node) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
@@ -383,13 +439,26 @@ class DistEffFloatArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
-        /**
-         * @brief get the size of this column
-         *
-         * @return size_t
-         */
-        size_t size() {
-            return numberOfElements;
+        void push_back(float val) {
+            assert(current_chunk != nullptr);
+            current_chunk->pushBack(val);
+            if (current_chunk->capacity == current_chunk->used) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+                currentChunkIdx += 1;
+                current_chunk = new FixedFloatArray(chunkSize);
+            }
+        }
+
+        void lock() {
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
+            if (current_chunk->used > 0) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+            } else {
+                delete current_chunk;
+            }
         }
 
         /**
@@ -413,14 +482,28 @@ class DistEffBoolArr : public Object {
         size_t numberOfElements;
         String* id;
         Distributable* kvStore;
+        size_t metadata_node;
+        FixedBoolArray* current_chunk;
+
+        DistEffBoolArr(String* id_var, Distributable* kvStore_var, size_t node, bool get) {
+            id = id_var->clone();
+            kvStore = kvStore_var;
+            metadata_node = node;
+            chunkSize = get ? kvStore->get_size_t(node, id->clone()->concat("-chunkSize")) : 50;
+            capacity = get ? kvStore->get_size_t(node, id->clone()->concat("-capacity")) : 1;
+            currentChunkIdx = get ? kvStore->get_size_t(node, id->clone()->concat("-currentChunk")) : 0;
+            numberOfElements = get ? kvStore->get_size_t(node, id->clone()->concat("-numElements")) : 0;
+            current_chunk = get ? nullptr : new FixedBoolArray(chunkSize);
+        }
 
         /**
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffBoolArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffBoolArr(String* id_var, Distributable* kvStore_var, size_t node) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
             capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
             currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
@@ -432,9 +515,10 @@ class DistEffBoolArr : public Object {
          *
          * @param from
          */
-        DistEffBoolArr(EffBoolArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffBoolArr(EffBoolArr& from, String* id_var, Distributable* kvStore_var, size_t node) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
@@ -460,13 +544,26 @@ class DistEffBoolArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
-        /**
-         * @brief get the size of this column
-         *
-         * @return size_t
-         */
-        size_t size() {
-            return numberOfElements;
+        void push_back(bool val) {
+            assert(current_chunk != nullptr);
+            current_chunk->pushBack(val);
+            if (current_chunk->capacity == current_chunk->used) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+                currentChunkIdx += 1;
+                current_chunk = new FixedBoolArray(chunkSize);
+            }
+        }
+
+        void lock() {
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
+            if (current_chunk->used > 0) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+            } else {
+                delete current_chunk;
+            }
         }
 
         /**
@@ -490,20 +587,33 @@ class DistEffCharArr : public Object {
         size_t numberOfElements;
         String* id;
         Distributable* kvStore;
-        //CHANGE
-        EffCharArr original;
+        size_t metadata_node;
+        FixedCharArray* current_chunk;
+
+        DistEffCharArr(String* id_var, Distributable* kvStore_var, size_t node, bool get) {
+            id = id_var->clone();
+            kvStore = kvStore_var;
+            metadata_node = node;
+            chunkSize = get ? kvStore->get_size_t(node, id->clone()->concat("-chunkSize")) : 50;
+            capacity = get ? kvStore->get_size_t(node, id->clone()->concat("-capacity")) : 1;
+            currentChunkIdx = get ? kvStore->get_size_t(node, id->clone()->concat("-currentChunk")) : 0;
+            numberOfElements = get ? kvStore->get_size_t(node, id->clone()->concat("-numElements")) : 0;
+            current_chunk = get ? nullptr : new FixedCharArray(chunkSize);
+        }
 
         /**
          * @brief Construct a new Eff Col Arr object
          *
          */
-        DistEffCharArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffCharArr(String* id_var, Distributable* kvStore_var, size_t node) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
             capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
             currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
             numberOfElements = kvStore->get_size_t(metadata_node, id->clone()->concat("-numElements"));
+            current_chunk = new FixedCharArray(chunkSize);
         }
 
         /**
@@ -511,21 +621,18 @@ class DistEffCharArr : public Object {
          *
          * @param from
          */
-        DistEffCharArr(EffCharArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffCharArr(EffCharArr& from, String* id_var, Distributable* kvStore_var, size_t node, bool get) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
             numberOfElements = from.numberOfElements;
-            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
-            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
-            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
-            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
-            for (size_t i = 0; i < capacity; i += 1) {
+            for (size_t i = 0; i < currentChunkIdx; i += 1) {
                 kvStore->put(i % 5, id->clone()->concat("-")->concat(i), from.chunks[i]->clone());
             }
-            original = from;
+            current_chunk = get ? nullptr : new FixedCharArray(*from.chunks[currentChunkIdx]);
         }
 
         /**
@@ -540,13 +647,26 @@ class DistEffCharArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
-        /**
-         * @brief get the size of this column
-         *
-         * @return size_t
-         */
-        size_t size() {
-            return numberOfElements;
+        void push_back(char val) {
+            assert(current_chunk != nullptr);
+            current_chunk->pushBack(val);
+            if (current_chunk->capacity == current_chunk->used) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+                currentChunkIdx += 1;
+                current_chunk = new FixedCharArray(chunkSize);
+            }
+        }
+
+        void lock() {
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
+            if (current_chunk->used > 0) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+            } else {
+                delete current_chunk;
+            }
         }
 
         /**
@@ -570,10 +690,24 @@ class DistEffStrArr : public Object {
         size_t numberOfElements;
         String* id;
         Distributable* kvStore;
+        size_t metadata_node;
+        FixedStrArray* current_chunk;
 
-        DistEffStrArr(String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffStrArr(String* id_var, Distributable* kvStore_var, size_t node, bool get) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
+            chunkSize = get ? kvStore->get_size_t(node, id->clone()->concat("-chunkSize")) : 50;
+            capacity = get ? kvStore->get_size_t(node, id->clone()->concat("-capacity")) : 1;
+            currentChunkIdx = get ? kvStore->get_size_t(node, id->clone()->concat("-currentChunk")) : 0;
+            numberOfElements = get ? kvStore->get_size_t(node, id->clone()->concat("-numElements")) : 0;
+            current_chunk = get ? nullptr : new FixedStrArray(chunkSize);
+        }
+
+        DistEffStrArr(String* id_var, Distributable* kvStore_var, size_t node) {
+            id = id_var->clone();
+            kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = kvStore->get_size_t(metadata_node, id->clone()->concat("-chunkSize"));
             capacity = kvStore->get_size_t(metadata_node, id->clone()->concat("-capacity"));
             currentChunkIdx = kvStore->get_size_t(metadata_node, id->clone()->concat("-currentChunk"));
@@ -592,9 +726,10 @@ class DistEffStrArr : public Object {
             return numberOfElements == o->numberOfElements;
         }
 
-        DistEffStrArr(EffStrArr& from, String* id_var, Distributable* kvStore_var, size_t metadata_node) {
+        DistEffStrArr(EffStrArr& from, String* id_var, Distributable* kvStore_var, size_t node) {
             id = id_var->clone();
             kvStore = kvStore_var;
+            metadata_node = node;
             chunkSize = from.chunkSize;
             capacity = from.capacity;
             currentChunkIdx = from.currentChunkIdx;
@@ -614,8 +749,26 @@ class DistEffStrArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
-        size_t size() {
-            return numberOfElements;
+        void push_back(String* val) {
+            assert(current_chunk != nullptr);
+            current_chunk->pushBack(val);
+            if (current_chunk->size() == current_chunk->numElements()) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+                currentChunkIdx += 1;
+                current_chunk = new FixedStrArray(chunkSize);
+            }
+        }
+
+        void lock() {
+            kvStore->put(metadata_node, id->clone()->concat("-chunkSize"), chunkSize);
+            kvStore->put(metadata_node, id->clone()->concat("-capacity"), capacity);
+            kvStore->put(metadata_node, id->clone()->concat("-currentChunk"), currentChunkIdx);
+            kvStore->put(metadata_node, id->clone()->concat("-numElements"), numberOfElements);
+            if (current_chunk->numElements() > 0) {
+                kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
+            } else {
+                delete current_chunk;
+            }
         }
 
         ~DistEffStrArr() {

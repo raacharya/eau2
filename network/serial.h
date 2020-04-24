@@ -73,6 +73,14 @@ class Serializer: public Object {
             return buffer;
         }
 
+        static char* serialize(bool b, size_t& size) {
+            char* buffer = new char[sizeof(b)];
+            size_t curIndex = 0;
+            serializeInBuffer(buffer, curIndex, b);
+            size += curIndex;
+            return buffer;
+        }
+
         /**
          * Serialize this fixed int array
          * @param arr
@@ -256,6 +264,7 @@ class Serializer: public Object {
             for (size_t i = 0; i < used; i += 1) {
                 String* curVal = deserializeString(buffer, curIndex);
                 arr->pushBack(curVal);
+                delete curVal;
             }
             return arr;
         }
@@ -380,7 +389,7 @@ class Serializer: public Object {
             char msgAbbr = 'S';
             size_t msgAttributesSize = 0;
             char* msgAttributes = serializeMsgAttributes(s, msgAttributesSize);
-            char type = s->transfer->type;
+            char type = s->type();
             char* serializedChunk;
             size_t serializedChunkSize = 0;
             if (type == 'T') {
@@ -395,6 +404,8 @@ class Serializer: public Object {
                 serializedChunk = serialize(s->transfer->data->fs, serializedChunkSize);
             } else if (type == 'C') {
                 serializedChunk = serialize(s->transfer->data->fc, serializedChunkSize);
+            } else if (type == 'U') {
+                serializedChunk = serialize(s->transfer->data->b, serializedChunkSize);
             } else {
                 assert(false);
             }
@@ -541,6 +552,9 @@ class Serializer: public Object {
             } else if (type == 'C') {
                 FixedCharArray* arr = deserializeFixedCharArr(buffer, curIndex);
                 send = new Send(arr, key);
+            } else if (type == 'U') {
+                bool b = deserializeBool(buffer, curIndex);
+                send = new Send(b, key);
             } else {
                 assert(false);
             }
