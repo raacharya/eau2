@@ -363,62 +363,32 @@ class DistDataFrame : public Object {
             schema->lock();
         }
 
-        void fill_rows(Row** rows, DistIntColumn* col, size_t nrow, size_t col_num) {
-            size_t start = 0;
-            size_t index = 0;
-
-            while(start < nrow) {
-                FixedIntArray* curr = col->array->get_chunk(index);
-                for(size_t i = start; i < start + curr->used; i++) {
-                    rows[i]->set(col_num, curr->get(i));
-                }
-
-                start += columns->chunkSize;
+        void fill_rows(Row** rows, DistIntColumn* col, size_t chunkNum, size_t col_num) {
+            FixedIntArray* curr = col->array->get_chunk(chunkNum);
+            for(size_t i = 0; i < curr->used; i++) {
+                rows[i]->set(col_num, curr->get(i));
             }
         }
 
-        void fill_rows(Row** rows, DistFloatColumn* col, size_t nrow, size_t col_num) {
-            size_t start = 0;
-            size_t index = 0;
+        void fill_rows(Row** rows, DistFloatColumn* col, size_t chunkNum, size_t col_num) {
+            FixedFloatArray* curr = col->array->get_chunk(chunkNum);
+            for(size_t i = 0; i < curr->used; i++) {
+                rows[i]->set(col_num, curr->get(i));
+            }
+        }
 
-            while(start != nrow) {
-                FixedFloatArray* curr = col->array->get_chunk(index);
-                for(size_t i = start; i < start + curr->used; i++) {
-                    rows[i]->set(col_num, curr->get(i));
-                }
-
-                start += columns->chunkSize;
+        void fill_rows(Row** rows, DistBoolColumn* col, size_t chunkNum, size_t col_num) {
+            FixedBoolArray* curr = col->array->get_chunk(chunkNum);
+            for(size_t i = 0; i < curr->used; i++) {
+                rows[i]->set(col_num, curr->get(i));
             }
 
         }
 
-        void fill_rows(Row** rows, DistBoolColumn* col, size_t nrow, size_t col_num) {
-            size_t start = 0;
-            size_t end = columns->chunkSize;
-            size_t index = 0;
-
-            while(start != nrow) {
-                FixedBoolArray* curr = col->array->get_chunk(index);
-                for(size_t i = start; i < start + curr->used; i++) {
-                    rows[i]->set(col_num, curr->get(i));
-                }
-
-                start += columns->chunkSize;
-            }
-
-        }
-
-        void fill_rows(Row** rows, DistStringColumn* col, size_t nrow, size_t col_num) {
-            size_t start = 0;
-            size_t index = 0;
-
-            while(start != nrow) {
-                FixedStrArray* curr = col->array->get_chunk(index);
-                for(size_t i = start; i < start + curr->numElements(); i++) {
-                    rows[i]->set(col_num, curr->get(i));
-                }
-
-                start += columns->chunkSize;
+        void fill_rows(Row** rows, DistStringColumn* col, size_t chunkNum, size_t col_num) {
+            FixedStrArray* curr = col->array->get_chunk(chunkNum);
+            for(size_t i = 0; i < curr->numElements(); i++) {
+                rows[i]->set(col_num, curr->get(i));
             }
         }
 
@@ -428,24 +398,37 @@ class DistDataFrame : public Object {
         void map(Reader* reader) {
             size_t r = columns->get(0)->size();
             size_t c = columns->size();
-            Row** rows = new Row*[r];
+            size_t chunkSize = columns->chunkSize;
+            //fix
+            assert(r > 0);
+            size_t numChunks = ((r - 1) / chunkSize) + 1;
+            size_t index = 0;
 
-            for(size_t i = 0; i < c; i++) {
-                DistColumn* dcol = columns->get(i);
-                if(dcol->get_type() == 'I') {
-                    fill_rows(rows, dcol->as_int(), r, i);
-                } else if(dcol->get_type() == 'F') {
-                    fill_rows(rows, dcol->as_float(), r, i);
-                } else if(dcol->get_type() == 'B') {
-                    fill_rows(rows, dcol->as_bool(), r, i);
-                } else {
-                    fill_rows(rows, dcol->as_string(), r, i);
+            Row** rows = new Row*[chunkSize];
+
+            while(index < numChunks) {
+
+                for(size_t i = 0; i < c; i++) {
+                    DistColumn* dcol = columns->get(i);
+                    if(dcol->get_type() == 'I') {
+                        fill_rows(rows, dcol->as_int(), index, i);
+                    } else if(dcol->get_type() == 'F') {
+                        fill_rows(rows, dcol->as_float(), index, i);
+                    } else if(dcol->get_type() == 'B') {
+                        fill_rows(rows, dcol->as_bool(), index, i);
+                    } else {
+                        fill_rows(rows, dcol->as_string(), index, i);
+                    }
                 }
+
+                for(size_t i = 0; i < chunkSize; i++) {
+                    reader->visit(*rows[i]);
+                }
+
+                index += 1;
             }
 
-            for(size_t i = 0; i < r; i++) {
-                reader->visit(*rows[i]);
-            }
+            delete[] rows;
         }
 
         static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, bool *vals);
