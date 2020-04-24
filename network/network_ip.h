@@ -54,6 +54,13 @@ class NetworkIP : public Object {
             delete[] nodes_;
         }
 
+        void shutdown_open_conns() {
+            for (size_t i = 0; i < num_nodes; i += 1) {
+                if (nodes_[i].send != -1) close(nodes_[i].send);
+                if (nodes_[i].recv != -1) close(nodes_[i].recv);
+            }
+        }
+
         size_t index() { return this_node_; }
 
         void init_sock_(size_t port) {
@@ -146,10 +153,9 @@ class NetworkIP : public Object {
 
         void shutdown() {
             auto* kill = new Kill(this_node_, this_node_, 0);
-            NodeInfo & tgt = nodes_[kill->target_];
             int conn = socket(AF_INET, SOCK_STREAM, 0);
             assert(conn >= 0 && "Unable to create client socket");
-            if (connect(conn, (sockaddr *) &tgt.address, sizeof(tgt.address)) < 0)
+            if (connect(conn, (sockaddr *) &ip_, sizeof(ip_)) < 0)
                 assert(false && "Unable to connect to remote node");
             send_msg_(kill, conn);
             close(conn);
@@ -199,6 +205,7 @@ class NetworkIP : public Object {
 
         Message* recv_msg(int& req, bool keepAlive) {
             Message* msg = recv_message_(req);
+            if (msg == nullptr) return nullptr;
             NodeInfo & sender = nodes_[msg->sender_];
             if (sender.recv != -1) {
                 close(sender.recv);
@@ -242,8 +249,6 @@ class NetworkIP : public Object {
             if (req == -1) assert(false && "no established connection");
             size_t size = 0;
             if (read(req, &size, sizeof(size_t)) == 0) {
-                if (req != -1) close(req);
-                req = -1;
                 return nullptr;
             }
             char* buf = new char[size];

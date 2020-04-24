@@ -296,6 +296,7 @@ class DistDataFrame : public Object {
                 } else {
                     columns->push_back(new DistStringColumn(col_id, kvStore, key->node, false));
                 }
+                delete col_id;
             }
         }
 
@@ -369,6 +370,7 @@ class DistDataFrame : public Object {
                     column->as_float()->push_back(row.get_float(colIndex));
                 } else {
                     column->as_string()->push_back(row.get_string(colIndex));
+                    delete row.get_string(colIndex);
                 }
             }
         }
@@ -418,8 +420,8 @@ class DistDataFrame : public Object {
             assert(r > 0);
             size_t numChunks = ((r - 1) / chunkSize) + 1;
 
-            Row** rows = new Row*[chunkSize];
-            for (size_t i = 0; i < chunkSize; i += 1) {
+            Row** rows = new Row*[std::min(r, chunkSize)];
+            for (size_t i = 0; i < std::min(r, chunkSize); i += 1) {
                 rows[i] = new Row(c);
             }
 
@@ -444,7 +446,9 @@ class DistDataFrame : public Object {
 
                 index += inc;
             }
-
+            for (size_t i = 0; i < std::min(r, chunkSize); i += 1) {
+                delete rows[i];
+            }
             delete[] rows;
         }
 

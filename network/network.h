@@ -195,6 +195,7 @@ class Distributable : public Object {
                 assert(msg->key_->equals(send->key));
                 delete transfer;
                 delete send;
+                delete msg;
             }
             delete key;
         }
@@ -262,7 +263,6 @@ class Distributable : public Object {
             for (std::map<std::string, Transfer*>::iterator itr = kvStore.begin(); itr != kvStore.end(); itr++) {
                 delete (itr->second);
             }
-            network->shutdown();
             std::cout<<"shutdown\n";
             if (accept_conn_pid.joinable()) accept_conn_pid.join();
             std::cout<<"start\n";

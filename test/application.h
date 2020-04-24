@@ -95,6 +95,8 @@ class FileReader : public Writer {
             skipWhitespace_();
         }
 
+        ~FileReader() override { delete[] buf_; }
+
         static const size_t BUFSIZE = 1024;
 
         /** Reads more data from the file. */
@@ -167,7 +169,6 @@ class Combine : public Reader {
             size_t count = r.get_int(1);
             assert(word != nullptr);
             (*map_)[std::string(word->c_str())] += count;
-            //changed this to true
             return true;
         }
 };
@@ -226,10 +227,14 @@ public:
         in = new Key("data", 0);
     }
 
+    ~WordCount() {
+        delete in;
+    }
+
     /** The master nodes reads the input, then all of the nodes count. */
     void run_() override {
         if (index == 0) {
-            FileReader fr{"../100k.txt"};
+            FileReader fr{"100k.txt"};
             delete DistDataFrame::fromVisitor(in, kd, "S", &fr);
         }
         local_count();
@@ -248,7 +253,10 @@ public:
         String* okStr = key->clone()->concat(index);
         Key* ok = new Key(okStr->c_str(), 0);
         delete okStr;
+        delete key;
         delete DistDataFrame::fromVisitor(ok, kd, "SI", &cnt);
+        delete ok;
+        delete map;
     }
 
     /** Merge the data frames of all nodes */
