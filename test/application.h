@@ -222,7 +222,7 @@ public:
         DistDataFrame* words = kd->waitAndGet(*in);
         std::map<std::string, size_t> map;
         Adder add(&map);
-        // local map TODO
+        words->local_map(&add);
         delete words;
         Summer cnt(&map);
         delete DistDataFrame::fromVisitor(in, kd, "SI", &cnt);
