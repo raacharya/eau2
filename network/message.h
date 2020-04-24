@@ -4,17 +4,10 @@
 #include "../array/array.h"
 
 class Message : public Object {
-
-    // the message kind
-
     public:
-
         MsgKind kind_;
-
         size_t sender_; // the index of the sender node
-
         size_t target_; // the index of the receiver node
-
         size_t id_;     // an id t unique within the node
 
         Message() {}
@@ -32,6 +25,7 @@ class Message : public Object {
 
 class Kill : public Message {
     public:
+
         Kill(size_t sender, size_t target, size_t id) :
         Message(MsgKind::Kill, sender, target, id) {}
 };

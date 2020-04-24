@@ -174,56 +174,6 @@ class Serializer: public Object {
             return buffer;
         }
 
-        static char* serialize(EffIntArr* arr) {
-            size_t bufferSize = sizeof(size_t);
-            bufferSize += (arr->numberOfElements) * sizeof(int);
-            size_t curIndex = 0;
-            char* buffer = new char[bufferSize];
-            serializeInBuffer(buffer, curIndex, arr->numberOfElements);
-            for (size_t wordIndex = 0; wordIndex < arr->numberOfElements; wordIndex += 1) {
-                serializeInBuffer(buffer, curIndex, arr->get(wordIndex));
-            }
-            return buffer;
-        }
-
-        static char* serialize(EffFloatArr* arr) {
-            size_t bufferSize = sizeof(size_t);
-            bufferSize += (arr->numberOfElements) * sizeof(float);
-            size_t curIndex = 0;
-            char* buffer = new char[bufferSize];
-            serializeInBuffer(buffer, curIndex, arr->numberOfElements);
-            for (size_t wordIndex = 0; wordIndex < arr->numberOfElements; wordIndex += 1) {
-                serializeInBuffer(buffer, curIndex, arr->get(wordIndex));
-            }
-            return buffer;
-        }
-
-        static char* serialize(EffBoolArr* arr) {
-            size_t bufferSize = sizeof(size_t);
-            bufferSize += (arr->numberOfElements) * sizeof(bool);
-            size_t curIndex = 0;
-            char* buffer = new char[bufferSize];
-            serializeInBuffer(buffer, curIndex, arr->numberOfElements);
-            for (size_t wordIndex = 0; wordIndex < arr->numberOfElements; wordIndex += 1) {
-                serializeInBuffer(buffer, curIndex, arr->get(wordIndex));
-            }
-            return buffer;
-        }
-
-        static char* serialize(EffStrArr* arr) {
-            size_t bufferSize = sizeof(size_t);
-            for (size_t i = 0; i < arr->numberOfElements; i += 1) {
-                bufferSize += (arr->size() + 1);
-            }
-            size_t curIndex = 0;
-            char* buffer = new char[bufferSize];
-            serializeInBuffer(buffer, curIndex, arr->numberOfElements);
-            for (size_t wordIndex = 0; wordIndex < arr->numberOfElements; wordIndex += 1) {
-                serializeInBuffer(buffer, curIndex, arr->get(wordIndex));
-            }
-            return buffer;
-        }
-
         static FixedIntArray* deserializeFixedIntArr(const char* buffer, size_t& curIndex) {
             size_t capacity = deserializeSizeT(buffer, curIndex);
             size_t used = deserializeSizeT(buffer, curIndex);
@@ -277,26 +227,6 @@ class Serializer: public Object {
                 char curVal = buffer[curIndex];
                 arr->pushBack(curVal);
                 curIndex += 1;
-            }
-            return arr;
-        }
-
-        static EffStrArr* deserializeEffStrArr(char* buffer) {
-            size_t curIndex = 0;
-            size_t numberOfElements = deserializeSizeT(buffer, curIndex);
-            auto* arr = new EffStrArr();
-            for (size_t wordIndex = 0; wordIndex < numberOfElements; wordIndex += 1) {
-                arr->pushBack(deserializeString(buffer, curIndex));
-            }
-            return arr;
-        }
-
-        static EffFloatArr* deserializeEffFloatArr(char* buffer) {
-            size_t curIndex = 0;
-            size_t numberOfElements = deserializeSizeT(buffer, curIndex);
-            auto* arr = new EffFloatArr();
-            for (size_t wordIndex = 0; wordIndex < numberOfElements; wordIndex += 1) {
-                arr->pushBack(deserializeFloat(buffer, curIndex));
             }
             return arr;
         }

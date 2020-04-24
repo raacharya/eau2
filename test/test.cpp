@@ -6,46 +6,6 @@
 #include "../network/network_ip.h"
 
 /**
- * Ensures that the serializer correctly serializes and deserializes a string array
- */
-void testStringArr() {
-    Schema s("S");
-    DataFrame df(s);
-    Row r(df.get_schema());
-    for (size_t i = 0; i < 5; i+=1) {
-        r.set(0, new String("finna"));
-        df.add_row(r);
-    }
-    EffStrArr* arr = df.columns->get(0)->as_string()->array;
-    char* serializedString = Serializer::serialize(arr);
-    EffStrArr* serializedArr = Serializer::deserializeEffStrArr(serializedString);
-    assert(arr->equals(serializedArr));
-    delete[] serializedString;
-    delete serializedArr;
-    std::cout << "works for string array" << "\n";
-}
-
-/**
- * Ensures that the serializer correctly serializes and deserializes a float array
- */
-void testFloatArr() {
-    Schema s("F");
-    DataFrame df(s);
-    Row r(df.get_schema());
-    for (size_t i = 0; i < 5; i+=1) {
-        r.set(0, (float) 156.7);
-        df.add_row(r);
-    }
-    EffFloatArr* arr = df.columns->get(0)->as_float()->array;
-    char* serializedFloat = Serializer::serialize(arr);
-    EffFloatArr* serializedArr = Serializer::deserializeEffFloatArr(serializedFloat);
-    assert(arr->equals(serializedArr));
-    delete[] serializedFloat;
-    delete serializedArr;
-    std::cout << "works for float array" << "\n";
-}
-
-/**
  * Ensures that the serializer correctly serializes and deserializes a message
  */
 void testMessageDirectory() {
@@ -111,6 +71,7 @@ void testMessageGet() {
     assert(strcmp(key, get->key->c_str()) == 0);
     delete[] serializedMessage;
     delete get;
+    delete g;
     std::cout << "works for get" << "\n";
 }
 
@@ -141,7 +102,10 @@ void testMessageSend() {
     assert(3 == send->transfer->int_chunk()->get(3));
     assert(4 == send->transfer->int_chunk()->get(4));
     delete[] serializedMessage;
+    delete send->transfer;
     delete send;
+    delete s->transfer;
+    delete s;
     std::cout << "works for send" << "\n";
 }
 
@@ -165,23 +129,8 @@ void testMessageRegister() {
     assert(port == deserializedMessage->port);
     delete[] serializedMessage;
     delete deserializedMessage;
+    delete m;
     std::cout << "works for registry" << "\n";
-}
-
-void testNetwork() {
-    size_t num_nodes = 5;
-    auto* ips = new NetworkIP[num_nodes];
-    auto* pids = new std::thread[num_nodes];
-    pids[0] = std::thread(&NetworkIP::server_init, ips[0], 0, 9000);
-    for (size_t i = 1; i < num_nodes; i += 1) {
-        pids[i] = std::thread(&NetworkIP::client_init, ips[i], i, 9000 + i, "127.0.0.1", 9000);
-    }
-    for (size_t i = 0; i < num_nodes; i += 1) {
-        pids[i].join();
-    }
-    delete[] ips;
-    delete[] pids;
-    std::cout << "works for network" << "\n";
 }
 
 /**
@@ -191,13 +140,10 @@ void testNetwork() {
  * @return
  */
 int main(int argc, char** argv) {
-//    testStringArr();
-//    testFloatArr();
-//    testMessageDirectory();
-//    testMessageGet();
-//    testMessageSend();
-//    testMessageRegister();
-//    testNetwork();
+    testMessageDirectory();
+    testMessageGet();
+    testMessageSend();
+    testMessageRegister();
     auto** kds = new KDStore*[5];
     auto* pids = new std::thread[5];
     auto** wcs = new WordCount*[5];
