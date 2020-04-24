@@ -136,18 +136,37 @@ class FileReader : public Writer {
 class Adder : public Reader {
     public:
 
-        std::map<std::string, size_t> map_;  // String to Num map;  Num holds an int
+        std::map<std::string, size_t>* map_;  // String to Num map;  Num holds an int
 
         explicit Adder(std::map<std::string, size_t>* map) {
-            map_ = *map;
+            map_ = map;
         }
 
         bool visit(Row& r) {
             String* word = r.get_string(0);
             assert(word != nullptr);
-            size_t num = (map_.find(std::string(word->c_str())) != map_.end()) ?
-                    map_[std::string(word->c_str())] : 0;
-            map_[std::string(word->c_str())] = num + 1;
+            size_t num = (map_->find(std::string(word->c_str())) != map_->end()) ?
+                         (*map_)[std::string(word->c_str())] : 0;
+            (*map_)[std::string(word->c_str())] = num + 1;
+            //changed this to true
+            return true;
+        }
+};
+
+class Combine : public Reader {
+    public:
+
+        std::map<std::string, size_t>* map_;  // String to Num map;  Num holds an int
+
+        explicit Combine(std::map<std::string, size_t>* map) {
+            map_ = map;
+        }
+
+        bool visit(Row& r) {
+            String* word = r.get_string(0);
+            size_t count = r.get_int(1);
+            assert(word != nullptr);
+            (*map_)[std::string(word->c_str())] += count;
             //changed this to true
             return true;
         }
@@ -210,7 +229,7 @@ public:
     /** The master nodes reads the input, then all of the nodes count. */
     void run_() override {
         if (index == 0) {
-            FileReader fr{"../filename.txt"};
+            FileReader fr{"../100k.txt"};
             delete DistDataFrame::fromVisitor(in, kd, "S", &fr);
         }
         local_count();
@@ -220,12 +239,16 @@ public:
     /** Compute word counts on the local node and build a data frame. */
     void local_count() {
         DistDataFrame* words = kd->waitAndGet(*in);
-        std::map<std::string, size_t> map;
-        Adder add(&map);
+        auto* map = new std::map<std::string, size_t>();
+        Adder add(map);
         words->local_map(&add);
         delete words;
-        Summer cnt(&map);
-        delete DistDataFrame::fromVisitor(in, kd, "SI", &cnt);
+        Summer cnt(map);
+        auto* key = new String("wc-map-");
+        String* okStr = key->clone()->concat(index);
+        Key* ok = new Key(okStr->c_str(), 0);
+        delete okStr;
+        delete DistDataFrame::fromVisitor(ok, kd, "SI", &cnt);
     }
 
     /** Merge the data frames of all nodes */
@@ -250,7 +273,7 @@ public:
     }
 
     static void merge(DistDataFrame* df, std::map<std::string, size_t>* m) {
-        Adder add(m);
+        Combine add(m);
         df->map(&add);
         delete df;
     }

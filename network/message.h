@@ -36,6 +36,20 @@ class Kill : public Message {
         Message(MsgKind::Kill, sender, target, id) {}
 };
 
+class Ack : public Message {
+    public:
+        String* key_;
+
+        Ack(size_t sender, size_t target, size_t id, const char* key) :
+                Message(MsgKind::Ack, sender, target, id) {
+            key_ = new String(key);
+        }
+
+        ~Ack() {
+            delete key_;
+        }
+};
+
 class Finished : public Message {
     public:
         String* key_;

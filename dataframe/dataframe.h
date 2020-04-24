@@ -411,16 +411,17 @@ class DistDataFrame : public Object {
         /**
          * Read this distributed df with the given reader
          */
-        void mapHelp(Reader* reader, size_t inc) {
+        void mapHelp(Reader* reader, size_t inc, size_t index) {
             size_t r = columns->get(0)->size();
             size_t c = columns->size();
             size_t chunkSize = columns->chunkSize;
-            //fix
             assert(r > 0);
             size_t numChunks = ((r - 1) / chunkSize) + 1;
-            size_t index = 0;
 
             Row** rows = new Row*[chunkSize];
+            for (size_t i = 0; i < chunkSize; i += 1) {
+                rows[i] = new Row(c);
+            }
 
             while(index < numChunks) {
 
@@ -437,7 +438,7 @@ class DistDataFrame : public Object {
                     }
                 }
 
-                for(size_t i = 0; i < chunkSize; i++) {
+                for(size_t i = 0; i < std::min(r, chunkSize); i++) {
                     reader->visit(*rows[i]);
                 }
 
@@ -448,11 +449,11 @@ class DistDataFrame : public Object {
         }
 
         void map(Reader* reader) {
-            mapHelp(reader, 1);
+            mapHelp(reader, 1, 0);
         }
 
         void local_map(Reader* reader) {
-            mapHelp(reader, 5);
+            mapHelp(reader, 5, kvStore->index);
         }
 
         static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, bool *vals);
@@ -611,10 +612,11 @@ DistDataFrame* DistDataFrame::fromVisitor(Key* key, KDStore* kdStore, const char
     DistDataFrame* ddf = new DistDataFrame(schema, key, kdStore->kvStore);
 
     while(!r->done()) {
-        Row row(schema);
+        Row row(strlen(type));
         r->visit(row);
         ddf->add_row(row);
     }
     ddf->lock();
+    kdStore->kvStore->send_finished_update(key->key->c_str());
     return ddf;
 }

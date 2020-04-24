@@ -49,6 +49,7 @@ class Distributable : public Object {
         std::set<std::string> completed_dfs;
         std::mutex complete_df_lock;
         std::condition_variable complete_df_cond;
+        std::mutex map_lock;
 
         Distributable(size_t index_var) {
             index = index_var;
@@ -101,8 +102,10 @@ class Distributable : public Object {
             do {
                 if (msg->kind_ == MsgKind::Get) {
                     Get* get = dynamic_cast<Get*>(msg);
+                    map_lock.lock();
                     assert(kvStore.find(std::string(get->key->c_str())) != kvStore.end());
                     Transfer* val = kvStore.find(std::string(get->key->c_str()))->second;
+                    map_lock.unlock();
                     assert(get->type == val->type);
                     Send* send = new Send(val, get->key->c_str());
                     send->target_ = get->sender_;
@@ -113,11 +116,16 @@ class Distributable : public Object {
                     delete send;
                 } else if (msg->kind_ == MsgKind::Send) {
                     Send* send = dynamic_cast<Send*>(msg);
+                    map_lock.lock();
                     if (kvStore.find(std::string(send->key->c_str())) != kvStore.end()) {
                         delete kvStore[std::string(send->key->c_str())];
                     }
                     kvStore[std::string(send->key->c_str())] = send->transfer;
+                    map_lock.unlock();
+                    Ack* ack = new Ack(send->target_, send->sender_, 0, send->key->c_str());
                     delete send;
+                    network->send_reply(ack, true);
+                    delete ack;
                 } else if (msg->kind_ == MsgKind::Finished) {
                     Finished* finished = dynamic_cast<Finished*>(msg);
                     std::unique_lock<std::mutex> df_lock(complete_df_lock);
@@ -136,6 +144,8 @@ class Distributable : public Object {
                     Finished* finished = new Finished(index, i, 0, key);
                     network->send_msg(finished, true);
                     delete finished;
+                } else {
+                    completed_dfs.insert(std::string(key));
                 }
             }
         }
@@ -173,12 +183,16 @@ class Distributable : public Object {
             while (!handshake_done) handshake_cond.wait(lck);
             lck.unlock();
             if (node == index) {
+                map_lock.lock();
                 kvStore[std::string(key->c_str())] = transfer;
+                map_lock.unlock();
             } else {
                 Send* send = new Send(transfer, key->c_str());
                 send->sender_ = index;
                 send->target_ = node;
                 network->send_msg(send, true);
+                Ack* msg = dynamic_cast<Ack*>(network->recv_reply(node, true));
+                assert(msg->key_->equals(send->key));
                 delete transfer;
                 delete send;
             }
@@ -222,6 +236,7 @@ class Distributable : public Object {
 
         Transfer* get_(size_t node, char type, String* key) {
             Transfer* transfer;
+            map_lock.lock();
             if (kvStore.find(std::string(key->c_str())) != kvStore.end()) {
                 transfer = kvStore.find(std::string(key->c_str()))->second;
             } else {
@@ -236,6 +251,7 @@ class Distributable : public Object {
                 kvStore[std::string(key->c_str())] = transfer;
                 delete send;
             }
+            map_lock.unlock();
             delete key;
             assert(type == transfer->type);
             return transfer;

@@ -315,6 +315,8 @@ class Serializer: public Object {
                 buf = serializeKill(dynamic_cast<Kill*>(m), size);
             } else if (m->kind_ == MsgKind::Finished) {
                 buf = serializeFinished(dynamic_cast<Finished*>(m), size);
+            } else if (m->kind_ == MsgKind::Ack) {
+                buf = serializeAck(dynamic_cast<Ack*>(m), size);
             }
             return buf;
         }
@@ -444,6 +446,23 @@ class Serializer: public Object {
             return buffer;
         }
 
+        static char* serializeAck(Ack* m, size_t& size) {
+            char msgAbbr = 'A';
+            size_t msgAttributesSize = 0;
+            char* msgAttributes = serializeMsgAttributes(m, msgAttributesSize);
+            char* buffer = new char[1 + msgAttributesSize + m->key_->size() + 1];
+            size_t curIndex = 0;
+            buffer[0] = msgAbbr;
+            curIndex += 1;
+            for (size_t i = 0; i < msgAttributesSize; i += 1, curIndex += 1) {
+                buffer[curIndex] = msgAttributes[i];
+            }
+            delete[] msgAttributes;
+            serializeInBuffer(buffer, curIndex, m->key_);
+            size += curIndex;
+            return buffer;
+        }
+
         static char* serializeFinished(Finished* m, size_t& size) {
             char msgAbbr = 'F';
             size_t msgAttributesSize = 0;
@@ -491,6 +510,8 @@ class Serializer: public Object {
                 return deserializeKill(buffer);
             } else if (buffer[0] == 'F') {
                 return deserializeFinished(buffer);
+            } else if (buffer[0] == 'A') {
+                return deserializeAck(buffer);
             }
             return nullptr;
         }
@@ -593,6 +614,17 @@ class Serializer: public Object {
             size_t id = deserializeSizeT(buffer, curIndex);
             auto* kill = new Kill(sender, target, id);
             return kill;
+        }
+
+        static Ack* deserializeAck(char* buffer) {
+            size_t curIndex = 1;
+            size_t sender = deserializeSizeT(buffer, curIndex);
+            size_t target = deserializeSizeT(buffer, curIndex);
+            size_t id = deserializeSizeT(buffer, curIndex);
+            char* key = deserializeChar(buffer, curIndex);
+            auto* ack = new Ack(sender, target, id, key);
+            delete[] key;
+            return ack;
         }
 
         static Finished* deserializeFinished(char* buffer) {
