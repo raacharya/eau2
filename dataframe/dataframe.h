@@ -382,7 +382,7 @@ class DistDataFrame : public Object {
         /**
          * Read this distributed df with the given reader
          */
-        void map(Reader* reader) {
+        void mapHelp(Reader* reader, size_t inc) {
             size_t r = columns->get(0)->size();
             size_t c = columns->size();
             size_t chunkSize = columns->chunkSize;
@@ -412,10 +412,18 @@ class DistDataFrame : public Object {
                     reader->visit(*rows[i]);
                 }
 
-                index += 1;
+                index += inc;
             }
 
             delete[] rows;
+        }
+
+        void map(Reader* reader) {
+            mapHelp(reader, 1);
+        }
+
+        void local_map(Reader* reader) {
+            mapHelp(reader, 5);
         }
 
         static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, bool *vals);
