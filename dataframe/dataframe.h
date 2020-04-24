@@ -340,8 +340,21 @@ class DistDataFrame : public Object {
             columns->push_back(col);
         }
 
-        void add_row(Row* row) {
-
+        void add_row(Row& row) {
+            size_t cols_size = columns->size();
+            for (size_t colIndex = 0; colIndex < cols_size; colIndex += 1) {
+                DistColumn* column = columns->get(colIndex);
+                char colType = column->get_type();
+                if (colType == 'I') {
+                    column->as_int()->push_back(row.get_int(colIndex));
+                } else if (colType == 'B') {
+                    column->as_bool()->push_back(row.get_bool(colIndex));
+                } else if (colType == 'F') {
+                    column->as_float()->push_back(row.get_float(colIndex));
+                } else {
+                    column->as_string()->push_back(row.get_string(colIndex));
+                }
+            }
         }
 
         void lock() {
@@ -443,7 +456,7 @@ class DistDataFrame : public Object {
 
         static DistDataFrame *fromArray(Key *key, KDStore *kdStore, size_t size, int *vals);
 
-        static DistDataFrame *fromVisitor(Key* key, Distributable* kvstore, const char* schema, Writer* r);
+        static DistDataFrame *fromVisitor(Key* key, KDStore *kdStore, const char* schema, Writer* r);
 };
 
 class KDStore : public Object {
@@ -586,15 +599,15 @@ DistDataFrame* KDStore::waitAndGet(Key& key) {
 /**
  * Create a DistDataFrame from the given writer
  */
-DistDataFrame *fromVisitor(Key* key, Distributable* kvstore, const char* type, Writer* r) {
+DistDataFrame* DistDataFrame::fromVisitor(Key* key, KDStore* kdStore, const char* type, Writer* r) {
     Schema schema(type);
-    DataFrame newDf(schema);
+    DistDataFrame* ddf = new DistDataFrame(schema, key, kdStore->kvStore);
 
     while(!r->done()) {
         Row row(schema);
         r->visit(row);
-        newDf.add_row(row);
+        ddf->add_row(row);
     }
-
-    return new DistDataFrame(newDf, key, kvstore);
+    ddf->lock();
+    return ddf;
 }

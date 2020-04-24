@@ -209,7 +209,7 @@ public:
     void run_() override {
         if (index == 0) {
             FileReader fr{"filename"};
-            delete DistDataFrame::fromVisitor(&in, kd->kvStore, "SI", &fr);
+            delete DistDataFrame::fromVisitor(&in, kd, "S", &fr);
         }
         local_count();
         reduce();
@@ -223,7 +223,7 @@ public:
         // local map TODO
         delete words;
         Summer cnt(&map);
-        delete DistDataFrame::fromVisitor(&in, kd->kvStore, "SI", &cnt);
+        delete DistDataFrame::fromVisitor(&in, kd, "SI", &cnt);
     }
 
     /** Merge the data frames of all nodes */
@@ -237,7 +237,7 @@ public:
         merge(kd->get(*own), &map);
         for (size_t i = 1; i < 5; ++i) { // merge other nodes
             String* okStr = key->clone()->concat(i);
-            Key* ok = new Key(okStr->c_str(), i);
+            Key* ok = new Key(okStr->c_str(), 0);
             delete okStr;
             merge(kd->waitAndGet(*ok), &map);
             delete ok;
