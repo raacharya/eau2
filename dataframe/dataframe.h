@@ -333,18 +333,51 @@ class DistDataFrame : public Object {
         void fill_rows(Row** rows, DistFloatColumn* col, size_t nrow, size_t col_num) {
             size_t start = 0;
             size_t end = columns->chunkSize;
+            size_t index = 0;
+
+            while(start != nrow) {
+                FixedFloatArray* curr = col->array->get_chunk(index);
+                for(size_t i = start; i < end; i++) {
+                    rows[i]->set(col_num, curr->get(i));
+                }
+
+                start += columns->chunkSize;
+                end += columns->chunkSize;
+            }
 
         }
 
         void fill_rows(Row** rows, DistBoolColumn* col, size_t nrow, size_t col_num) {
             size_t start = 0;
             size_t end = columns->chunkSize;
+            size_t index = 0;
+
+            while(start != nrow) {
+                FixedBoolArray* curr = col->array->get_chunk(index);
+                for(size_t i = start; i < end; i++) {
+                    rows[i]->set(col_num, curr->get(i));
+                }
+
+                start += columns->chunkSize;
+                end += columns->chunkSize;
+            }
 
         }
 
         void fill_rows(Row** rows, DistStringColumn* col, size_t nrow, size_t col_num) {
             size_t start = 0;
             size_t end = columns->chunkSize;
+            size_t index = 0;
+
+            while(start != nrow) {
+                FixedStrArray* curr = col->array->get_chunk(index);
+                for(size_t i = start; i < end; i++) {
+                    rows[i]->set(col_num, curr->get(i));
+                }
+
+                start += columns->chunkSize;
+                end += columns->chunkSize;
+            }
 
         }
 
@@ -368,6 +401,10 @@ class DistDataFrame : public Object {
                 } else {
                     fill_rows(rows, dcol->as_string(), r, i);
                 }
+            }
+
+            for(size_t i = 0; i < r; i++) {
+                reader->visit(*rows[i]);
             }
         }
 

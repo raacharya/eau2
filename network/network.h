@@ -627,6 +627,10 @@ class DistEffStrArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
+        FixedStrArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_str_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
+        }
+
         size_t size() {
             return numberOfElements;
         }
