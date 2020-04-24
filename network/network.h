@@ -114,7 +114,7 @@ class Distributable : public Object {
                 } else if (msg->kind_ == MsgKind::Send) {
                     Send* send = dynamic_cast<Send*>(msg);
                     if (kvStore.find(std::string(send->key->c_str())) != kvStore.end()) {
-
+                        delete kvStore[std::string(send->key->c_str())];
                     }
                     kvStore[std::string(send->key->c_str())] = send->transfer;
                     delete send;
@@ -334,6 +334,19 @@ class DistEffIntArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
+        FixedIntArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_int_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
+        }
+
+        /**
+         * @brief get the size of this column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return numberOfElements;
+        }
+
         void push_back(int val) {
             assert(current_chunk != nullptr);
             current_chunk->pushBack(val);
@@ -437,6 +450,19 @@ class DistEffFloatArr : public Object {
             size_t chunkIdx = idx / chunkSize;
             FixedFloatArray* curChunk = kvStore->get_float_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
             return curChunk->get(idx % chunkSize);
+        }
+
+        FixedFloatArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_float_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
+        }
+
+        /**
+         * @brief get the size of this column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return numberOfElements;
         }
 
         void push_back(float val) {
@@ -544,6 +570,19 @@ class DistEffBoolArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
+        FixedBoolArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_bool_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
+        }
+
+        /**
+         * @brief get the size of this column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return numberOfElements;
+        }
+
         void push_back(bool val) {
             assert(current_chunk != nullptr);
             current_chunk->pushBack(val);
@@ -647,6 +686,19 @@ class DistEffCharArr : public Object {
             return curChunk->get(idx % chunkSize);
         }
 
+        FixedStrArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_str_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
+        }
+
+        /**
+         * @brief get the size of this column
+         *
+         * @return size_t
+         */
+        size_t size() {
+            return numberOfElements;
+        }
+
         void push_back(char val) {
             assert(current_chunk != nullptr);
             current_chunk->pushBack(val);
@@ -747,6 +799,14 @@ class DistEffStrArr : public Object {
             size_t chunkIdx = idx / chunkSize;
             FixedStrArray* curChunk = kvStore->get_str_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
             return curChunk->get(idx % chunkSize);
+        }
+
+        FixedStrArray* get_chunk(size_t chunkIdx) {
+            return kvStore->get_str_chunk(chunkIdx % 5, id->clone()->concat("-")->concat(chunkIdx));
+        }
+
+        size_t size() {
+            return numberOfElements;
         }
 
         void push_back(String* val) {
