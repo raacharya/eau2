@@ -430,10 +430,10 @@ class EffCharArr : public Object {
         }
 
         ~EffCharArr() {
-//          for (int i = 0; i < capacity; i += 1) {
-//            delete chunks[i];
-//          }
-//          delete[] chunks;
+          for (int i = 0; i < capacity; i += 1) {
+            delete chunks[i];
+          }
+          delete[] chunks;
         }
 };
 
