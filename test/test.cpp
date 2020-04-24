@@ -199,17 +199,19 @@ int main(int argc, char** argv) {
 //    testMessageRegister();
 //    testNetwork();
     auto** kds = new KDStore*[5];
+    auto* pids = new std::thread[5];
     for (size_t i = 0; i < 5; i += 1) {
         kds[i] = new KDStore(i);
-        sleep(1);
     }
     for (size_t i = 0; i < 5; i += 1) {
-        Trivial triv(i, kds[i]);
-        triv.run_();
+        WordCount wc(i, kds[i]);
+        pids[i] = std::thread(&WordCount::run_, wc);
     }
-    delete kds[2];
     for (size_t i = 0; i < 5; i += 1) {
-        if (i != 2) delete kds[i];
+        pids[i].join();
+    }
+    for (size_t i = 0; i < 5; i += 1) {
+        delete kds[i];
     }
     delete[] kds;
     std::cout<<"Tests passed\n";

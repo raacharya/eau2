@@ -23,8 +23,8 @@ class Trivial : public Application {
     public:
         explicit Trivial(size_t idx, KDStore* kd_var) : Application(idx, kd_var) { }
         void run_() override {
-            if (index == 2) {
-                size_t SZ = 1000 * 1;
+            if (index == 0) {
+                size_t SZ = 1000 * 1000;
                 auto** vals = new String*[SZ];
                 double sum = 0;
                 for (size_t i = 0; i < SZ; ++i) {
@@ -74,9 +74,9 @@ class FileReader : public Writer {
                 ++i_;
             }
             buf_[i_] = 0;
-            String word(buf_ + wStart, i_ - wStart);
+            auto* word = new String(buf_ + wStart, i_ - wStart);
             //change
-            r.set(0, &word);
+            r.set(0, word);
             ++i_;
             skipWhitespace_();
         }
@@ -200,16 +200,18 @@ class Summer : public Writer {
 class WordCount: public Application {
 public:
     static const size_t BUFSIZE = 1024;
-    Key in;
+    Key* in;
 
     WordCount(size_t idx, KDStore* net):
-            Application(idx, net), in("data", 0) {}
+            Application(idx, net) {
+        in = new Key("data", 0);
+    }
 
     /** The master nodes reads the input, then all of the nodes count. */
     void run_() override {
         if (index == 0) {
-            FileReader fr{"filename"};
-            delete DistDataFrame::fromVisitor(&in, kd, "S", &fr);
+            FileReader fr{"../filename.txt"};
+            delete DistDataFrame::fromVisitor(in, kd, "S", &fr);
         }
         local_count();
         reduce();
@@ -217,13 +219,13 @@ public:
 
     /** Compute word counts on the local node and build a data frame. */
     void local_count() {
-        DistDataFrame* words = kd->waitAndGet(in);
+        DistDataFrame* words = kd->waitAndGet(*in);
         std::map<std::string, size_t> map;
         Adder add(&map);
         // local map TODO
         delete words;
         Summer cnt(&map);
-        delete DistDataFrame::fromVisitor(&in, kd, "SI", &cnt);
+        delete DistDataFrame::fromVisitor(in, kd, "SI", &cnt);
     }
 
     /** Merge the data frames of all nodes */

@@ -275,12 +275,28 @@ class DistDataFrame : public Object {
         DistDataFrame(Schema& schema_var, Key* key, Distributable* kvStore_var) {
             id = key->key->clone()->concat("-df");
             kvStore = kvStore_var;
+            locked_ = false;
             schema = new DistSchema(schema_var, key, kvStore);
-            String* cols_id = id->clone();
-            cols_id->concat("-cols");
+            String* cols_id = id->clone()->concat("-cols");
             columns = new DistEffColArr(schema->types, cols_id, kvStore, key->node, false);
             delete cols_id;
-            locked_ = false;
+            for (int i = 0; i < schema_var.types->size(); i += 1) {
+                char curType = schema_var.types->get(i);
+                DistFixedColArray* currentChunk = columns->array[columns->currentChunkIdx];
+                size_t chunkIdx = currentChunk->size() == currentChunk->numElements() ?
+                        columns->currentChunkIdx + 1 : columns->currentChunkIdx;
+                String* col_id = id->clone()->concat("-cols-")->concat(chunkIdx)->concat("-")
+                        ->concat(columns->numberOfElements);
+                if (curType == 'I') {
+                    columns->push_back(new DistIntColumn(col_id, kvStore, key->node, false));
+                } else if (curType == 'F') {
+                    columns->push_back(new DistFloatColumn(col_id, kvStore, key->node, false));
+                } else if (curType == 'B') {
+                    columns->push_back(new DistBoolColumn(col_id, kvStore, key->node, false));
+                } else {
+                    columns->push_back(new DistStringColumn(col_id, kvStore, key->node, false));
+                }
+            }
         }
 
         DistDataFrame(Key* key, Distributable* kvStore_var) {
@@ -573,7 +589,7 @@ void KDStore::put(Key& key, DataFrame* df) {
  */
 DistDataFrame* KDStore::waitAndGet(Key& key) {
     std::unique_lock<std::mutex> df_lock(kvStore->complete_df_lock);
-    while (kvStore->completed_dfs.find(std::string(key.key->c_str())) != kvStore->completed_dfs.end())
+    while (kvStore->completed_dfs.find(std::string(key.key->c_str())) == kvStore->completed_dfs.end())
         kvStore->complete_df_cond.wait(df_lock);
     df_lock.unlock();
     return new DistDataFrame(&key, kvStore);

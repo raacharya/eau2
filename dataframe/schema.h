@@ -46,7 +46,6 @@ class Schema : public Object {
           * in undefined behavior. */
         void add_column(char typ, String *name) {
             types->pushBack(typ);
-            columns->pushBack(name);
         }
 
         /** Add a row with a name (possibly nullptr), name is external.  Names are

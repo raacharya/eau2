@@ -350,6 +350,7 @@ class DistEffIntArr : public Object {
         void push_back(int val) {
             assert(current_chunk != nullptr);
             current_chunk->pushBack(val);
+            numberOfElements += 1;
             if (current_chunk->capacity == current_chunk->used) {
                 kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
                 currentChunkIdx += 1;
@@ -468,6 +469,7 @@ class DistEffFloatArr : public Object {
         void push_back(float val) {
             assert(current_chunk != nullptr);
             current_chunk->pushBack(val);
+            numberOfElements += 1;
             if (current_chunk->capacity == current_chunk->used) {
                 kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
                 currentChunkIdx += 1;
@@ -586,6 +588,7 @@ class DistEffBoolArr : public Object {
         void push_back(bool val) {
             assert(current_chunk != nullptr);
             current_chunk->pushBack(val);
+            numberOfElements += 1;
             if (current_chunk->capacity == current_chunk->used) {
                 kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
                 currentChunkIdx += 1;
@@ -702,6 +705,7 @@ class DistEffCharArr : public Object {
         void push_back(char val) {
             assert(current_chunk != nullptr);
             current_chunk->pushBack(val);
+            numberOfElements += 1;
             if (current_chunk->capacity == current_chunk->used) {
                 kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
                 currentChunkIdx += 1;
@@ -812,6 +816,7 @@ class DistEffStrArr : public Object {
         void push_back(String* val) {
             assert(current_chunk != nullptr);
             current_chunk->pushBack(val);
+            numberOfElements += 1;
             if (current_chunk->size() == current_chunk->numElements()) {
                 kvStore->put(currentChunkIdx % 5, id->clone()->concat("-")->concat(currentChunkIdx), current_chunk);
                 currentChunkIdx += 1;

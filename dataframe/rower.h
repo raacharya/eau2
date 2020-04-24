@@ -219,15 +219,23 @@ class Writer: public Rower {
 
 public:
 
-    virtual void visit(Row& r);
+    virtual void visit(Row& r) {
+        assert(false);
+    }
 
-    virtual bool done();
+    virtual bool done() {
+        assert(false);
+    }
 };
 
 class Reader: public Rower  {
 public:
 
-    virtual bool visit(Row& r);
+    virtual bool visit(Row& r) {
+        assert(false);
+    }
 
-    virtual bool done();
+    virtual bool done() {
+        assert(false);
+    }
 };
